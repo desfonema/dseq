@@ -1,0 +1,32 @@
+0.3.2
+
+* Individual mute for each track instead of "solo" mode
+* Player thread handling pattern playing for better performance
+* Better code for song refreshing on patter name change
+* Code cleanup in roll painting
+* Track expansion/shrinking
+* Variable lenght note in live recording
+* More comments and code reogranization for easy hacking
+* New shortcuts Alt+PgUp/Alt+PgDown for moving +1 octave/-1 octave
+* Step size in step editing mode
+* Fixed noise in synth/port change while playing
+
+0.3.1
+
+* Implemented nanosleep for better precision
+* Quantize code cleaned
+* Improved ALSA Midi connection system
+* MIDI Input configuration
+* Note paint in piano roll more readable
+* Scales helper
+* Volume change of selection with input volume selector
+* Prevent deleting last track in a pattern
+* Added Alt+T and Alt+P accelerators for creating tracks and pasting tracks in the Pattern Editor
+* Save configuration with last opened path
+* Fixed MIDI Input bug
+* Fixed lots of grab focus misbehaviors in Pattern Editor
+* Fixed bugs in playing thread
+* Fixed bug in note resize
+* Fixed Gtk Warning in Pattern Editor
+* Fixed bug that showed old track in piano roll when deleting track
+* Other small fixes that user will never know what was wrong
