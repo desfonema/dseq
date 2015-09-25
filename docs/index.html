@@ -19,7 +19,6 @@
 	Supposing that you are using Debian or Ubuntu you can installall of them by: <br/>
 	<pre>apt-get install python-dev libasound2-dev python-gtk2 alsa-utils</pre>
 
-	Desfonema Sequencer is a midi sequencer, so you gonna need some midi synth's to actually hear any sound. If you didn't already then you gonna want to install Yoshimi, Hidrogen, etc and install the low latency audio daemon Jack to use them.
 	<h3>0.2 Download, Unpackage, Compile modules</h3>
 
 	The most basic instructions are:
@@ -31,138 +30,7 @@ sh make_modules.sh</pre>
 	
 	<h3>0.3 Test Run</h3>
 	Try <pre>python dseq.py</pre> and if everything was ok you should see the main window.
-	<br><img src="main_start.png" alt="Main Window"> 
-	<h2>1. The Main Window</h2>
 	
-	When you start the dseq (Desfonema Sequencer) you find the Main Window. There you have the Toolbar, the Patterns section and the Song Section. 
-	In dseq you create patterns that you later arrange in order to make a song, very much like in a traditional tracker, so the very first thing you wanna do is to Add a Pattern.
-	Once you have some patterns you Add them into the Song list so you can actually listen them in order.
 	
-	<h3>1.1 Main Window Menu</h3>
-	The Main Window Menu has a very basic and self explanatory File menu with commands like New, Open, Save, Save As, and Quit. Also has some less obvious options:
-	
-	<ul>
-	<li>File->Import Patterns: Import the patterns from another song.</li>
-	<li>File->Import Seq24 Sequences: Import the sequences from a Seq24 song.</li>
-	<li>Patterns->Add Pattern: Add New Pattern to the Pattern list.</li>
-	<li>Patterns->Paste Pattern: Add New Pattern from Clipboard.</li>
-	</ul>
-	
-	<h3>1.2 Toolbar</h3>
-	<img src="main_toolbar.png" alt="Main Toolbar"> 
-	
-	<ul>
-	<li>Add Pattern: Add New Pattern to the Pattern list.</li>
-	<li>Paste Pattern: Add New Pattern from Clipboard.</li>
-	<li>Bpm: Song bitrate.</li>
-	<li>Pos: Pattern position to play in the Song list.</li>
-	<li>Play/Stop: Play/Stop the Song.</li>
-	</ul>
-	
-	<h3>1.3 Patterns Section</h3>
-	<img src="main_patterns.png" alt="Patterns Section"> <br>
-	
-	Once you have one or more patterns the Patterns Section starts to get populated. For each pattern you have a set of controls
-	<ul>
-	<li>Edit Pattern: Open the pattern in the Pattern Editor.</li>
-	<li>Copy Pattern: Copy the pattern to the Clipboard.</li>
-	<li>Del Pattern: Delete the pattern.</li>
-	<li>Name: Pattern name.</li>
-	<li>Play: Play the pattern once.</li>
-	</ul>
-	
-	<h3>1.4 Song Section</h3>
-	<img src="main_song.png" alt="Song Section"> <br>
-	
-	To append a new pattern at the end of the Song use the Add button on top of the Song Section.
-	With the existing patterns into the song list you have
-	<ol>
-	<li>Pattern position into the song.</li>
-	<li>Pattern Selection: Selects the pattern played in that position.</li>
-	<li>Del: Deletes the pattern in that position.</li>
-	<li>Ins: Inserts the same pattern after the position.</li>
-	</ol>
-	
-	<h2>2. The Pattern Editor</h2>
-	<img src="pat_window.png" alt="Pattern Editor"> <br>
-	The patter editor is where you work most of the time. Each pattern has one or more tracks of the same length. You have 3 controls that are common for the whole pattern:
-	<br><img src="pat_main_tools.png" alt="Pattern Tools"> 
-	<ul>
-	<li>Add Track: Adds a new track to the pattern (Alt+T).</li>
-	<li>Paste Track: Adds a new track from the clipboard to the pattern (Alt+P).</li>
-	<li>MIDI Input: Select MIDI Input Device.</li>
-	<li>Len: Pattern length.</li>
-	</ul>
-	After that you have the tracks in a tabbed interface.
-	<h3>2.1 Track Tabs</h3>
-	<img src="pat_track_tools.png" alt="Track"> <br>
-	Each track is represented in a tab with the set of controls and a piano roll interface for editing. 
-	The controls are:
-	<ul>
-	<li>Play/Stop: Play/Stop pattern. From the Piano Roll you can turn Play/Stop with Ctrl+p.</li>
-	<li>Grid: Size of the grid (and quantimization). From the Piano Roll you can change it using Crtl+1 to 4.</li>
-	<li>Octave: Octave in wich notes are inserted from the virtual keyboard input. From the Piano Roll you can change the Octave with Ctrl+Up and Ctrl+Down</li>
-	<li>Volume: Volume level at which new notes are inserted. From the Piano Roll you can change it with Keypad + and -. Also changes the volume of selected notes.</li>
-	<li>Scale: Filter notes to be in the range of a chosen major or minor scale.</li>
-	<li>Rec: Turn recording on/off. From the Piano Roll you can turn Play/Stop with Ctrl+r.</li>
-	<li>Mute Other Tracks: Solo mode on/off. From the Piano Roll you can turn Play/Stop with Ctrl+m.</li>
-	</ul>
-	<h2>3. The Piano Roll</h2>
-
-	<img src="pat_track_piano_roll.png" alt="Piano Roll"> <br>
-
-	The Piano Roll is the main interface where you insert and edit notes in each track. It has live editing while playing the pattern or step mode when the pattern is stopped.
-	You can insert notes just from the midi input, or use the virtual keyboard, or use the mouse like. The cursor is always selecting the note it's over. 
-	To select an area you have to always go from upper-left to bottom-right. Keyboard shortcuts are provided for the standard actions like copy, cut and paste. 
-	Also delete and backspace are used to delete all the notes in the cursor position and move forward or backward.<br>
-	The Piano Roll is designed with a heavy keyboard use in mind, but as gtk is a little bit tricky with focus you will have to click on it to let it grab the keyboard. I'm working to improve that.
-	
-	<h3>3.1 The Insert Cursor</h3>
-	<p>
-	When you insert notes in step edit mode they go where the insert cursor is, like in a text editor. You can move the insert cursor
-	with the Mouse Center Button:<br/>
-	<img src="mouse_c.png" alt="Mouse Center Button">
-	<br/>
-	Or with the cursor keys:<br/>
-	<img src="cursor.png" alt="Cursor Keys">
-	<br/>
-	</p>
-	<h3>3.2 Inserting notes</h3>
-	<p>
-	You can insert notes using the mouse right button:<br/>
-	<img src="mouse_r.png" alt="Mouse Right Button">
-	<br/>
-	Or you can insert notes trough the virtual keyboard:<br/>
-	<img src="vkeyb.png" alt="Virtual Keyboard">
-	<br/>
-	Or you can use your favorite midi input device.
-	</p>
-	<h3>3.3 Selecting Notes</h3>
-	<p>
-	You select notes holding down the Shift Key and moving with the Cursor Keys: <br/>
-	<img src="shift.png" alt="Shift"> <img src="cursor.png" alt="Cursor Keys">
-	<br/>
-	Or by selecting with the mouse holding the left button: <br/>
-	<img src="mouse_l.png" alt="Mouse Left Button">
-	<br/>
-	</p>
-	<h3>3.4 Moving Notes</h3>
-	<p>
-	You move notes holding down the Alt Key and moving with the Cursor Keys: <br/>
-	<img src="alt.png" alt="Alt"> <img src="cursor.png" alt="Cursor Keys">
-	<br/>
-	Or holding down the Shift Key and dragging them with the mouse holding the left button: <br/>
-	<img src="shift.png" alt="Shift"> <img src="mouse_l.png" alt="Mouse Left Button">
-	<br/>
-	</p>
-	<h3>3.5 Stretching Notes</h3>
-	<p>
-	You stretch notes holding down the Ctrl Key and moving with the Cursor Keys: <br/>
-	<img src="ctrl.png" alt="Ctrl"> <img src="cursor.png" alt="Cursor Keys">
-	<br/>
-	Or holding down the Ctrl Key and dragging them with the mouse holding the left button: <br/>
-	<img src="ctrl.png" alt="Ctrl"> <img src="mouse_l.png" alt="Mouse Left Button">
-	<br/>
-	</p>
 </body>
 </html>
