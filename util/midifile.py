@@ -1,8 +1,8 @@
 from midi.MidiOutStream import MidiOutStream
 from midi.MidiInFile import MidiInFile
-from Song import Song
-from Pattern import Pattern
-from Track import Track
+from models.Song import Song
+from models.Pattern import Pattern
+from models.Track import Track
 
 GUIDE = 12
 

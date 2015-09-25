@@ -17,7 +17,8 @@
 #This is the Track object, which has all the track properties and a note, controller and pitchbend list
 #Also has a Sequence object and keeps it updated for playing the midi events.
 
-from Sequence import *
+from models.Sequence import *
+
 TICKS_PER_BEAT = 24
 
 class Track:

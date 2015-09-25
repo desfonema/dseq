@@ -4,8 +4,9 @@ import pygtk
 import gtk
 import time
 import gobject
-import nanosleep
-import alsaseq
+
+from util import nanosleep
+from audio import alsaseq
 
 time.sleep = nanosleep.nanosleep
 

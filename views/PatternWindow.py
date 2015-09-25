@@ -1,8 +1,8 @@
 import gtk
 import gobject
-from TrackWidget import TrackWidget
-from ControllerEditorWidget import ControllerEditorWidget
-from PitchbendEditorWidget import PitchbendEditorWidget
+from views.TrackWidget import TrackWidget
+from views.ControllerEditorWidget import ControllerEditorWidget
+from views.PitchbendEditorWidget import PitchbendEditorWidget
 
 KEY_WIDTH = 14
 KEY_HEIGHT = 7

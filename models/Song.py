@@ -1,5 +1,5 @@
-from Pattern import Pattern
-from Channel import Channel
+from models.Pattern import Pattern
+from models.Channel import Channel
 
 class Song:
 	def __init__(self):

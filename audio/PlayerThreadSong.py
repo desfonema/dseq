@@ -1,13 +1,23 @@
 import threading
 import time
-import nanosleep
 import Queue
-import Sequence
+import jack
+from util import nanosleep
+import models.Sequence
+
+jack.attach("dseq")
+
+def get_time():
+    return float(jack.get_current_transport_frame()) / jack.get_sample_rate()
+
+#testing state set/get
+def get_state():
+    return jack.get_transport_state()
 
 time.sleep = nanosleep.nanosleep
 TICKS_PER_BEAT = 24
 
-class PlayerThread(threading.Thread):
+class PlayerThreadSong(threading.Thread):
 	def __init__(self, conn):  
 		threading.Thread.__init__(self)
 		#Position means pattern if playing a channel, or cursor pos if playing pattern 
@@ -18,16 +28,18 @@ class PlayerThread(threading.Thread):
 		self.__repeat = False
 		
 	def play(self, data, bpm, repeat = False):
-		if self.playing():
-			self.stop()
 			
 		self.__conn.refresh_connections()
-		self.__playing = True
-		self.__data = data
-		self.time_tick = (1./TICKS_PER_BEAT)/(bpm/60.0)
-		self.__repeat = repeat
-		self.__play_queue.put('play')
 
+	def set_data(self, data):
+		self.__data = data
+
+	def set_bpm(self, bpm):
+		self.time_tick = (1./TICKS_PER_BEAT)/(bpm/60.0)
+
+	def set_repeat(self, repeat):
+		self.__repeat = repeat
+		
 	def playing(self):
 		return self.__playing
 		
@@ -45,36 +57,41 @@ class PlayerThread(threading.Thread):
 		self.__pos = pos
 
 	def run(self):
-		data = self.__play_queue.get()
-		while data != 'quit':
-			print self.__data.__module__
-			#Are we playing a channel or a single module?
-			playing_channel = (self.__data.__module__ == 'Channel')
-			
-			if playing_channel:
-				patterns = self.__data.get_patterns()
-				
-				pos_max = len(patterns)
-				if self.__pos >= pos_max:
-					self.__pos = 0
-					
-				if pos_max:
-					pat = patterns[self.__pos]
-					pos = 0
-			else:
-				patterns = [self.__data]
-				pos_max = self.__data.get_len()*TICKS_PER_BEAT
-				pat = self.__data
-				pos = self.__pos
-				
-			if self.__pos >= pos_max:
-				self.__pos = 0
+		while True:
+			self.__playing = False			
+			while get_state() == 0:
+				time.sleep(0.05)
+
+			patterns = self.__data.get_patterns()
 
 			time_tick = self.time_tick
-			while self.__playing and (self.__pos < pos_max):
-				for track in pat.get_tracks():
-					#If playing channel we don't honor track mute. 
-					if playing_channel or track.enabled:
+			
+			self.__playing = True
+			self.__pos = -1
+
+			while get_state() == 1:
+				#Check current position
+				jack_pos = int(get_time()/time_tick)
+				if self.__pos == jack_pos:
+					time.sleep(0.001)
+					continue
+				
+				self.__pos = jack_pos
+				#Get current pattern and calculate maximum position
+				pos = 0
+				current_pattern = None
+				for pat in patterns:
+					plen = pat.len * TICKS_PER_BEAT
+					if self.__pos >= pos and self.__pos < pos + plen:
+						current_pattern = pat
+						break
+					pos += plen
+
+				pos = self.__pos - pos
+				
+				#Play current position of current pattern
+				if current_pattern:
+					for track in current_pattern.get_tracks():
 						synth_conn = self.__conn.get_port(track.get_synth())
 						port = track.get_port()
 						for (event, note, volume) in track.get_sequence()[pos]:
@@ -87,20 +104,7 @@ class PlayerThread(threading.Thread):
 									synth_conn.set_control(volume, note, port)
 								elif event == Sequence.PITCHBEND:
 									synth_conn.set_pitchbend(note, port)
-				time.sleep(time_tick)
-				pos = pos + 1
-				if playing_channel:
-					if pos == pat.get_len()*TICKS_PER_BEAT:
-						pos = 0
-						self.__pos = self.__pos + 1
-						pos_max = len(patterns)
-						if self.__pos < pos_max:
-							pat = patterns[self.__pos]
-				else:
-					pos_max = pat.get_len()*TICKS_PER_BEAT
-					if (pos == pos_max) and self.__repeat:
-						pos = 0
-					self.__pos = pos
+				
 			#Stop all sound
 			for pat in patterns:
 				for track in pat.get_tracks():
@@ -109,14 +113,6 @@ class PlayerThread(threading.Thread):
 					for seq_pos in track.get_sequence():
 						for (event, note, volume) in seq_pos:
 							if synth_conn != None: synth_conn.note_off(note, port)
-
-			if self.__pos >= pos_max:
-				self.__pos = 0
-
-			self.__playing = False
-				
-			data = self.__play_queue.get()
-
 	
 	def stop_sounds(self):
 		pass

@@ -2,19 +2,18 @@
 
 import gtk
 import time
-import midifile
 import gobject
 
-import Config
-from FileFormat import DSeq1
-from Song import Song
-from Pattern import Pattern
+from util import Config, midifile
+from util.FileFormat import DSeq1
+from models.Song import Song
+from models.Pattern import Pattern
 
-from Connections import Connections
-from PlayerThread import PlayerThread
-from PlayerThreadSong import PlayerThreadSong
+from audio.Connections import Connections
+from audio.PlayerThread import PlayerThread
+from audio.PlayerThreadSong import PlayerThreadSong
 
-from PatternWindow import PatternWindow
+from views.PatternWindow import PatternWindow
 
 VERSION = '0.4.0'
 gtk.gdk.threads_init()

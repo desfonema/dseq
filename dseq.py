@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 import gtk
-from SongWindow import SongWindow
+from views.SongWindow import SongWindow
 
 win = SongWindow()
 win.show()

@@ -1,6 +1,6 @@
 #Pattern object, a collection of tracks
 
-from Track import Track
+from models.Track import Track
 
 class Pattern:
 

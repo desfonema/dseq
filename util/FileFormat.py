@@ -1,7 +1,7 @@
-from Song import Song
-from Channel import Channel
-from Pattern import Pattern
-from Track import Track
+from models.Song import Song
+from models.Channel import Channel
+from models.Pattern import Pattern
+from models.Track import Track
 
 class DSeq1:
 	def __init__(self):
