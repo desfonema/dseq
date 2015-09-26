@@ -439,6 +439,7 @@ class SongWindow(gtk.Window):
         
         if response == gtk.RESPONSE_YES:
             self.player.quit()
+            self.player_pattern.quit()
             self.conf.save()
             gtk.main_quit()
             return False
