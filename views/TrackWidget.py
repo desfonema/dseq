@@ -30,11 +30,67 @@ VIRTUAL_KEYBOARD = [
 
 SCALE_MAJ = [0,2,4,5,7,9,11]
 SCALE_MIN = [0,2,3,5,7,9,11]
+
+EVENT_MODIFIER_NONE = 0
+EVENT_MODIFIER_SHIFT = gtk.gdk.SHIFT_MASK
+EVENT_MODIFIER_CTRL = gtk.gdk.CONTROL_MASK
+EVENT_MODIFIER_CTRL_SHIFT = gtk.gdk.SHIFT_MASK | gtk.gdk.CONTROL_MASK
+
+class KeyEventHook:
+    """
+    Define a Keyboard event hook when keys in property keys are pressed
+    and all modifiers are present.
+    """
+
+    modifiers = EVENT_MODIFIER_NONE
+    keys = []
+
+    def activate(self, widget, keycode):
+        """
+        Here is the code when this is activated (key down)
+        :param widget: is the widget that received the event
+        :param keycode: key code
+        """
+        pass
+
+    def deactivate(self, widget, keycode):
+        """
+        Here is the code when this is deactivated (key up).
+        :param widget: is the widget that received the event
+        :param keycode: key code
+        """
+        pass
+
+class KeyMoveCursor(KeyEventHook):
+    """
+    Move cursor with the keyboard
+    """
+    keys = [key.Left, key.Right, key.Up, key.Down]
+
+    def activate(self, widget, keycode):
+        #Move cursor
+        if keycode in [key.Left, key.Right]:
+            widget.move_cursor(
+                widget.cursor_pos +
+                (widget.cursor_pos % widget.note_size or widget.note_size) *
+                (1 if keycode == key.Right else -1)
+            )
+            selection_y = widget.selection_y
+        else:
+            selection_y = widget.selection_y + (1 if keycode == key.Up else -1)
+
+        widget.update_selection(widget.cursor_pos, selection_y, 1, 1)
                     
 class TrackWidget:
     """
     Track widget object
     """
+
+    # Which events are handled by hooks for the piano roll area
+    piano_roll_key_event_hooks = [
+        KeyMoveCursor()
+    ]
+
     def __init__(self, track, container):
         
         #Parent object
@@ -47,6 +103,9 @@ class TrackWidget:
         
         #Grid tick
         self.grid_tick = 1
+        # Note size is TICKS_PER_BEAT/self.grid_tick. Divide by 1... to keep formula present
+        self.note_size = TICKS_PER_BEAT / self.grid_tick
+
         #Step size
         self.step_size = 1
         
@@ -495,7 +554,7 @@ class TrackWidget:
         #Draw hard beat on black
         if (self.cursor_pos % TICKS_PER_BEAT) == 0:
             self.area.window.draw_line(self.gc_foreground, cursor_pos_x, 0, cursor_pos_x, piano_height)
-        elif (self.cursor_pos % (TICKS_PER_BEAT/self.grid_tick)) == 0:
+        elif (self.cursor_pos % self.note_size) == 0:
             self.area.window.draw_line(self.gc_grid, cursor_pos_x, 0, cursor_pos_x, piano_height)
         else:
             #Clear old cursor pos and draw grid points cleaned
@@ -521,7 +580,7 @@ class TrackWidget:
         self.area.window.draw_rectangle(self.gc_cursor, False, 
                 self.selection_x * self.cursor_width, 
                 note_start * self.cursor_height,
-                (self.selection_width) * self.cursor_width * (TICKS_PER_BEAT/self.grid_tick),
+                (self.selection_width) * self.cursor_width * self.note_size,
                 self.selection_height * self.cursor_height)
 
         
@@ -532,10 +591,10 @@ class TrackWidget:
         self.area.window.draw_rectangle(self.gc_grid, False, 
                 self.selection_x * self.cursor_width, 
                 note_start * self.cursor_height,
-                (self.selection_width * (TICKS_PER_BEAT/self.grid_tick)) * self.cursor_width,
+                (self.selection_width * self.note_size) * self.cursor_width,
                 self.selection_height * self.cursor_height)
 
-        for pos in [self.selection_x, self.selection_x + (self.selection_width * (TICKS_PER_BEAT/self.grid_tick))]:
+        for pos in [self.selection_x, self.selection_x + (self.selection_width * self.note_size)]:
 
             #Draw hard beat on black
             if (pos % TICKS_PER_BEAT) == 0:
@@ -557,10 +616,8 @@ class TrackWidget:
     def area_button_press_event(self, widget, event):
         self.area.grab_focus()
         
-        note_size = TICKS_PER_BEAT / self.grid_tick
-        
         pos = int(event.x / self.cursor_width)
-        diff = pos % note_size
+        diff = pos % self.note_size
         pos = pos - diff
 
         note = 128 -  int(event.y / self.cursor_height)
@@ -572,7 +629,7 @@ class TrackWidget:
             #Add it to track
             if self.recording:
                 self.mouse_painting = 1
-                self.paint_note(note,pos,note_size)
+                self.paint_note(note, pos, self.note_size)
                 if synth_conn != None: 
                     synth_conn.note_on(note, self.track.get_port(), self.volume)
                     time.sleep(0.05)
@@ -588,22 +645,18 @@ class TrackWidget:
             self.move_cursor(pos)
         
     def area_button_release_event(self, widget, event):
-        note_size = TICKS_PER_BEAT / self.grid_tick
-        
         state = event.state
 
         if self.mouse_painting:
-            self.add_note(self.mouse_note, self.mouse_pos, note_size, self.volume)
+            self.add_note(self.mouse_note, self.mouse_pos, self.note_size, self.volume)
             
         self.mouse_painting = 0
         
     def area_motion_notify(self, widget, event):
-        note_size = TICKS_PER_BEAT / self.grid_tick
-
         synth_conn = self.conn.get_port(self.track.get_synth())
         
         micropos = int(event.x / self.cursor_width)
-        diff = micropos % note_size
+        diff = micropos % self.note_size
         pos = micropos - diff
 
         note = 128 -  int(event.y / self.cursor_height)
@@ -620,7 +673,7 @@ class TrackWidget:
                 if micropos - self.mouse_micropos:
                     self.resize_selection(micropos - self.mouse_micropos)
             else:
-                width =  (pos - self.selection_x) /note_size + 1
+                width =  (pos - self.selection_x)/self.note_size + 1
                 height = self.selection_y - note
 
                 if width < 1: width = 1
@@ -632,20 +685,20 @@ class TrackWidget:
         elif self.mouse_painting:
 
             if pos != self.mouse_pos:
-                self.add_note(self.mouse_note, self.mouse_pos, note_size, self.volume)
+                self.add_note(self.mouse_note, self.mouse_pos, self.note_size, self.volume)
                 if synth_conn != None: 
                     synth_conn.note_on(self.mouse_note, self.track.get_port(), self.volume)
                     time.sleep(0.1)
                     synth_conn.note_off(self.mouse_note, self.track.get_port())
                     
-                self.paint_note(note,pos,note_size)
+                self.paint_note(note,pos, self.note_size)
             elif note != self.mouse_note:
-                self.clear_note(self.mouse_note,self.mouse_pos,note_size)
+                self.clear_note(self.mouse_note,self.mouse_pos, self.note_size)
                 for (snote, stime, sduration, svolume) in self.track.get_notes():
                     if snote == self.mouse_note and stime == pos:
                         self.paint_note(snote, stime, sduration)
                     
-                self.paint_note(note,pos,note_size)
+                self.paint_note(note, pos, self.note_size)
 
         self.paint_piano_note(self.mouse_note, self.gc_background)
         
@@ -665,6 +718,13 @@ class TrackWidget:
         val = event.keyval
         state = event.state
         synth_conn = self.conn.get_port(self.track.get_synth())
+
+        # Check for hooks on this key/modifier combination
+        for hook in self.piano_roll_key_event_hooks:
+            if state == hook.modifiers and val in hook.keys:
+                # If found, run hook and exit returning True
+                hook.activate(self, val)
+                return True
         
         #Control mask, to get shortcuts and avoid having to go with the mouse
         if state == gtk.gdk.CONTROL_MASK:
@@ -731,7 +791,7 @@ class TrackWidget:
                 elif val == key.Left and self.selection_width > 1:
                     diff_width = -1
                 #horrible formula to avoid going too far... must think about this and make it clear
-                elif val == key.Right and self.selection_x + self.selection_width * TICKS_PER_BEAT/self.grid_tick< self.pat.get_len()*TICKS_PER_BEAT:
+                elif val == key.Right and self.selection_x + self.selection_width * self.note_size < self.pat.get_len()*TICKS_PER_BEAT:
                     diff_width = 1
                             
                 #Update Selection
@@ -752,15 +812,13 @@ class TrackWidget:
                 elif val == key.Down:
                     note_diff = -1
                 elif val == key.Left:
-                    pos_diff = -(TICKS_PER_BEAT/self.grid_tick)
+                    pos_diff = -self.note_size
                 elif val == key.Right:
-                    pos_diff = (TICKS_PER_BEAT/self.grid_tick)
+                    pos_diff = self.note_size
                     
                 self.move_selection(self.selection_x + pos_diff, self.selection_y + note_diff)
 
         else:
-            note_size = TICKS_PER_BEAT / self.grid_tick
-
             if val == key.space:
                 if self.vk_space == 0:
 
@@ -768,7 +826,7 @@ class TrackWidget:
                         
                     #Add it to track
                     if self.recording:
-                        self.add_note(self.selection_y, pos, note_size, self.volume)
+                        self.add_note(self.selection_y, pos, self.note_size, self.volume)
                     
                     if synth_conn != None: synth_conn.note_on(self.selection_y, self.track.get_port(), self.volume)
                     self.vk_space = 1
@@ -812,18 +870,18 @@ class TrackWidget:
                         else:
                             if self.player.playing():
                                 #if we are playing, we must qantize
-                                beat_size = TICKS_PER_BEAT/self.grid_tick
+                                beat_size = self.note_size
                                 diff = self.cursor_pos % beat_size
                                 pos = self.cursor_pos - diff
                                 pat_len = self.pat.get_len()*TICKS_PER_BEAT
                                 #Live recording. Save position, velocity and paint the start
                                 self.notes_start_position_velocity[note] = (pos, self.volume)
-                                self.paint_note(note, pos % pat_len , note_size)
+                                self.paint_note(note, pos % pat_len , self.note_size)
                                     
                             else:
                                 pos = self.cursor_pos
                                 #Add it to track
-                                self.add_note(note, pos, note_size, self.volume)
+                                self.add_note(note, pos, self.note_size, self.volume)
                                                         
                             #Update Selection
                             self.update_selection(pos, note, self.selection_width, self.selection_height)
@@ -835,47 +893,20 @@ class TrackWidget:
                     #Keyboard status, to avoid repetition.
                     self.vk_status[key_index] = 1
                     self.vk_count = self.vk_count + 1
-                    
-            if val in [key.Left, key.Right, key.Up, key.Down]:
-                
-                #Move cursor
-                if (self.cursor_pos % note_size):
-                    if val == key.Left:
-                        self.move_cursor(self.cursor_pos - (self.cursor_pos % note_size))
-                    if val == key.Right:
-                        self.move_cursor(self.cursor_pos + (self.cursor_pos % note_size))
-                else:
-                    if val == key.Left:
-                        self.move_cursor(self.cursor_pos - note_size)
-                    if val == key.Right:
-                        self.move_cursor(self.cursor_pos + note_size)
-                
-                #Change Selection Coords
-                if val == key.Up:
-                    selection_y = self.selection_y + 1
-                elif val == key.Down:
-                    selection_y = self.selection_y - 1
-                else:
-                    selection_y = self.selection_y
-                    
-                self.update_selection(self.cursor_pos, selection_y, 1, 1)
-            
-            elif val == key.Delete:
+
+            if val == key.Delete:
                 if not self.deleting:
                     self.deleting = 1
                     
             elif val == key.BackSpace:
-
-                note_size = TICKS_PER_BEAT / self.grid_tick
-                
                 #Delete only if recording and don't delete here if playing
                 if not self.player.playing() and self.recording:
 
                     #Move cursor manually 
-                    if (self.cursor_pos % note_size):
-                        self.move_cursor(self.cursor_pos - (self.cursor_pos % note_size))
+                    if (self.cursor_pos % self.note_size):
+                        self.move_cursor(self.cursor_pos - (self.cursor_pos % self.note_size))
                     else:
-                        self.move_cursor(self.cursor_pos - note_size * self.step_size)
+                        self.move_cursor(self.cursor_pos - self.note_size * self.step_size)
 
                     #Delete
                     del_notes = []
@@ -934,16 +965,15 @@ class TrackWidget:
                     if synth_conn != None: synth_conn.note_off(note, self.track.get_port())
                 
                     if self.recording:
-                        note_size = TICKS_PER_BEAT / self.grid_tick
                         if self.player.playing():
                             (pos, velocity) = self.notes_start_position_velocity[note]
-                            duration = self.cursor_pos - (self.cursor_pos % note_size) - pos
+                            duration = self.cursor_pos - (self.cursor_pos % self.note_size) - pos
                             #Cut note duration at end of pattern
                             if duration < 0:
                                 duration = self.pat.get_len()*TICKS_PER_BEAT - pos
                             #Minimal size is note size (grid size)
-                            if duration < note_size: 
-                                duration = note_size
+                            if duration < self.note_size: 
+                                duration = self.note_size
                             
                             #Delete original temorary note    
                             self.del_note(note,pos)
@@ -952,16 +982,14 @@ class TrackWidget:
                         else:
                             #If not playing move cursor manually and recording
                             if self.vk_count == 0:
-                                if (self.cursor_pos % note_size):
-                                    self.move_cursor(self.cursor_pos + note_size - (self.cursor_pos % note_size))
+                                if (self.cursor_pos % self.note_size):
+                                    self.move_cursor(self.cursor_pos + self.note_size - (self.cursor_pos % self.note_size))
                                 else:
-                                    self.move_cursor(self.cursor_pos + note_size * self.step_size)
+                                    self.move_cursor(self.cursor_pos + self.note_size * self.step_size)
                                     
                                 self.update_selection(self.cursor_pos, self.selection_y, 1, 1)
                     
             elif val == key.Delete:
-                note_size = TICKS_PER_BEAT / self.grid_tick
-                
                 #Delete only if recording and don't delete here if playing
                 if not self.player.playing() and self.recording:
                     #Full delete?
@@ -973,10 +1001,10 @@ class TrackWidget:
                                 self.del_note(dnote, dpos, dduration)
 
                     #Move cursor manually 
-                    if (self.cursor_pos % note_size):
-                        self.move_cursor(self.cursor_pos + note_size - (self.cursor_pos % note_size))
+                    if (self.cursor_pos % self.note_size):
+                        self.move_cursor(self.cursor_pos + self.note_size - (self.cursor_pos % self.note_size))
                     else:
-                        self.move_cursor(self.cursor_pos + note_size)
+                        self.move_cursor(self.cursor_pos + self.note_size)
 
                     self.update_selection(self.cursor_pos, self.selection_y, 1, 1)
                 
@@ -990,9 +1018,6 @@ class TrackWidget:
         if self.player.playing():
             self.move_cursor(self.player.get_pos())
         
-        #Note size calculation
-        note_size = TICKS_PER_BEAT / self.grid_tick
-
         synth_conn = self.conn.get_port(self.track.get_synth())
 
         #MIDI Input
@@ -1022,7 +1047,7 @@ class TrackWidget:
                     #Are we making changes?
                     if self.recording:
                         #In case we are playing we qantize the note
-                        pos = self.cursor_pos - (self.cursor_pos % note_size)
+                        pos = self.cursor_pos - (self.cursor_pos % self.note_size)
 
                         pat_len = self.pat.get_len()*TICKS_PER_BEAT
                         
@@ -1035,13 +1060,13 @@ class TrackWidget:
                                 self.notes_start_position_velocity[note] = (pos, self.volume)
 
                             #Paint it
-                            self.paint_note(note, pos % pat_len , note_size)
+                            self.paint_note(note, pos % pat_len , self.note_size)
                         else:
                             #If not playing, we add the note right now
                             if self.cbo_vol.get_active() > 7:
-                                self.add_note(note, pos, note_size, event['data']['note']['velocity'])
+                                self.add_note(note, pos, self.note_size, event['data']['note']['velocity'])
                             else:
-                                self.add_note(note, pos, note_size, self.volume)
+                                self.add_note(note, pos, self.note_size, self.volume)
 
                     if self.cbo_vol.get_active() > 7:
                         if synth_conn != None: synth_conn.note_on(note, self.track.get_port(), event['data']['note']['velocity'])
@@ -1056,23 +1081,23 @@ class TrackWidget:
                         if self.player.playing():
                             note = event['data']['note']['note']
                             (pos, velocity) = self.notes_start_position_velocity[note]
-                            duration = self.cursor_pos - (self.cursor_pos % note_size) - pos
+                            duration = self.cursor_pos - (self.cursor_pos % self.note_size) - pos
                             #Cut note duration at end of pattern
                             if duration < 0:
                                 duration = self.pat.get_len()*TICKS_PER_BEAT - pos
                             #Minimal size is note size (grid size)
-                            if duration < note_size: 
-                                duration = note_size
+                            if duration < self.note_size: 
+                                duration = self.note_size
                             
                             #Add new real note
                             self.add_note(note, pos, duration, velocity)
                             
                         elif self.midi_keyboard_count == 0: 
                             #Move cursor if not playing and all notes are released
-                            if (self.cursor_pos % note_size):
-                                self.move_cursor(self.cursor_pos + note_size - (self.cursor_pos % note_size))
+                            if (self.cursor_pos % self.note_size):
+                                self.move_cursor(self.cursor_pos + self.note_size - (self.cursor_pos % self.note_size))
                             else:
-                                self.move_cursor(self.cursor_pos + note_size * self.step_size)
+                                self.move_cursor(self.cursor_pos + self.note_size * self.step_size)
 
                     if synth_conn != None: synth_conn.note_off(event['data']['note']['note'], self.track.get_port())
             elif event['type'] == alsaseq.EVENT_CONTROLLER:
@@ -1111,9 +1136,8 @@ class TrackWidget:
             self.player.stop()
 
             #Complete cursor movement.
-            note_size = TICKS_PER_BEAT / self.grid_tick
-            if (self.cursor_pos % note_size):
-                self.move_cursor(self.cursor_pos + note_size - (self.cursor_pos % note_size))
+            if (self.cursor_pos % self.note_size):
+                self.move_cursor(self.cursor_pos + self.note_size - (self.cursor_pos % self.note_size))
             else:
                 self.move_cursor(self.cursor_pos)
 
@@ -1124,10 +1148,10 @@ class TrackWidget:
         widths = (1, 2, 3, 4, 6, 8)
         self.grid_tick = widths[widget.get_active()]
         
-        note_size = TICKS_PER_BEAT / self.grid_tick
+        self.note_size = TICKS_PER_BEAT / self.grid_tick
 
-        if (self.cursor_pos % note_size) and not self.player.playing():
-            self.move_cursor(self.cursor_pos - (self.cursor_pos % note_size))
+        if (self.cursor_pos % self.note_size) and not self.player.playing():
+            self.move_cursor(self.cursor_pos - (self.cursor_pos % self.note_size))
 
         self.paint_roll()
         self.area.grab_focus()
@@ -1185,7 +1209,7 @@ class TrackWidget:
         for (note, pos, duration, volume) in self.track.get_notes():
             if (note <= self.selection_y and note > (self.selection_y - self.selection_height) and 
                     pos >= self.selection_x and 
-                    pos < self.selection_x + (self.selection_width * (TICKS_PER_BEAT/self.grid_tick))):
+                    pos < self.selection_x + (self.selection_width * self.note_size)):
 
                 self.selection.append( (note, pos, duration, volume) )
     
@@ -1354,9 +1378,6 @@ class TrackWidget:
         note_width = self.cursor_width        
         note_height = self.cursor_height
         
-        #Where do gray ticks mark
-        beat_tick = TICKS_PER_BEAT/self.grid_tick
-
         #Horizontal lines
         for i in range (note_from, note_to):
             self.area.window.draw_line(self.gc_grid, 
@@ -1371,7 +1392,7 @@ class TrackWidget:
                 self.area.window.draw_line(self.gc_foreground, 
                         tmp_pos * note_width, note_from * note_height, 
                         tmp_pos * note_width, note_to * note_height)
-            elif tmp_pos % beat_tick == 0:
+            elif tmp_pos % self.note_size == 0:
                 self.area.window.draw_line(self.gc_grid, 
                         tmp_pos * note_width, note_from * note_height, 
                         tmp_pos * note_width, note_to * note_height)
