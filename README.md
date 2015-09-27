@@ -133,8 +133,10 @@ Or by selecting with the mouse holding the left button:
 ###Moving Notes
 
 You move notes holding down the Alt Key and moving with the Cursor Keys:
-![Alt]
-(https://raw.githubusercontent.com/desfonema/dseq/master/docs/Alt.png)
+![Ctrl]
+(https://raw.githubusercontent.com/desfonema/dseq/master/docs/ctrl.png)
+![Shift]
+(https://raw.githubusercontent.com/desfonema/dseq/master/docs/shift.png)
 ![Cursor Keys]
 (https://raw.githubusercontent.com/desfonema/dseq/master/docs/cursor.png)
 

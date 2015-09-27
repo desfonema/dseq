@@ -80,7 +80,350 @@ class KeyMoveCursor(KeyEventHook):
             selection_y = widget.selection_y + (1 if keycode == key.Up else -1)
 
         widget.update_selection(widget.cursor_pos, selection_y, 1, 1)
+
+class KeyDeletePiano(KeyEventHook):
+    keys = [key.Delete]
+
+    def activate(self, widget, keycode):
+        if not widget.deleting:
+            widget.deleting = 1
+
+    def deactivate(self, widget, keycode):
+        #Delete only if recording and don't delete here if playing
+        if not widget.player.playing() and widget.recording:
+            #Full delete?
+            if widget.deleting == 1:
+                del_notes = []
+                for item in widget.track.get_notes(): del_notes.append(item)
+                for (dnote, dpos, dduration, dvolume) in del_notes:
+                    if dpos == widget.cursor_pos:
+                        widget.del_note(dnote, dpos, dduration)
+
+            #Move cursor manually 
+            if (widget.cursor_pos % widget.note_size):
+                widget.move_cursor(widget.cursor_pos + widget.note_size - (widget.cursor_pos % widget.note_size))
+            else:
+                widget.move_cursor(widget.cursor_pos + widget.note_size)
+
+            widget.update_selection(widget.cursor_pos, widget.selection_y, 1, 1)
+        
+        #Always clear delete note
+        widget.deleting = 0
+            
+class KeyBackspacePiano(KeyEventHook):
+    keys = [key.BackSpace]
+
+    def activate(self, widget, keycode):
+        #Delete only if recording and don't delete here if playing
+        if not widget.player.playing() and widget.recording:
+
+            #Move cursor manually 
+            if (widget.cursor_pos % widget.note_size):
+                widget.move_cursor(widget.cursor_pos - (widget.cursor_pos % widget.note_size))
+            else:
+                widget.move_cursor(widget.cursor_pos - widget.note_size * widget.step_size)
+
+            #Delete
+            del_notes = []
+            for item in widget.track.get_notes(): del_notes.append(item)
+            for (dnote, dpos, dduration, dvolume) in del_notes:
+                if dpos == widget.cursor_pos:
+                    widget.del_note(dnote, dpos, dduration)
+
+            #I have drink a lot of wine now... so i'm in lazy mode. repainting cursor the bad way
+            widget.move_cursor(widget.cursor_pos)
+
+            widget.update_selection(widget.cursor_pos, widget.selection_y, 1, 1)
                     
+
+class KeyGridSize(KeyEventHook):
+    """
+    Change Grid size
+    """
+
+    modifiers = EVENT_MODIFIER_CTRL
+    keys = [key._1, key._2, key._3, key._4, key._5, key._6]
+
+    def activate(self, widget, keycode):
+        #Grid size
+        widget.cbo_grid.set_active(self.keys.index(keycode))
+
+class KeyOctaveShift(KeyEventHook):
+    """
+    Change input octave shift up and down
+    """
+
+    modifiers = EVENT_MODIFIER_CTRL
+    keys = [key.Up, key.Down]
+
+    def activate(self, widget, keycode):
+        octave = widget.cbo_oct.get_active()
+        octave = max(0, octave-1) if keycode == key.Up else min(6, octave+1)
+        widget.cbo_oct.set_active(octave)
+
+
+class KeyResizeSelection(KeyEventHook):
+    """
+    Resizes notes in selection
+    """
+
+    modifiers = EVENT_MODIFIER_CTRL
+    keys = [key.Left, key.Right]
+
+    def activate(self, widget, keycode):
+        widget.resize_selection(1 if keycode==key.Right else -1)
+
+class KeyCutCopyPaste(KeyEventHook):
+    """
+    Resizes notes in selection
+    """
+
+    modifiers = EVENT_MODIFIER_CTRL
+    keys = [key.x, key.c, key.p]
+
+    def activate(self, widget, keycode):
+        #Cut Selection
+        if keycode == key.x:
+            widget.cut_selection()
+        #Copy Selection
+        elif keycode == key.c:
+            widget.copy_selection()
+        #Paste Selection
+        else:
+            widget.paste_selection()
+
+class KeyPlayControls(KeyEventHook):
+    """
+    Controls pattern play, stop, rec, and mute.
+    """
+
+    modifiers = EVENT_MODIFIER_CTRL
+    keys = [key.x, key.c, key.p]
+
+    def activate(self, widget, keycode):
+        #Play/Stop
+        if keycode == key.p:
+            if widget.player.playing():
+                widget.btn_stop_clicked(None)
+            else:
+                widget.btn_play_clicked(None)
+        #Stop
+        elif keycode == key.s:
+            widget.btn_stop_clicked(None)
+        #Rec on/off
+        elif keycode == key.r:
+            if widget.recording:
+                widget.chk_recording.set_active(0)
+                widget.recording = 0
+            else:
+                widget.chk_recording.set_active(1)
+                widget.recording = 1
+        #Mute trakcs
+        elif keycode == key.m:
+            #Muted track is NOT enabled... 
+            widget.chk_mute_track.set_active(widget.track.enabled)
+
+class KeySelection(KeyEventHook):
+    """
+    Select notes on the piano roll with the keyboard
+    """
+
+    modifiers = EVENT_MODIFIER_SHIFT
+    keys = [key.Left, key.Right, key.Up, key.Down]
+
+    def activate(self, widget, keycode):
+        diff_width = 0
+        diff_height = 0
+
+        #Change selection size
+        if keycode == key.Up and widget.selection_height > 1:
+            diff_height = -1
+        elif keycode == key.Down:
+            diff_height = 1
+        elif keycode == key.Left and widget.selection_width > 1:
+            diff_width = -1
+        #horrible formula to avoid going too far... must think about this and make it clear
+        elif keycode == key.Right and widget.selection_x + widget.selection_width * widget.note_size < widget.pat.get_len()*TICKS_PER_BEAT:
+            diff_width = 1
+                    
+        #Update Selection
+        widget.update_selection(
+            widget.selection_x,
+            widget.selection_y, 
+            widget.selection_width + diff_width,
+            widget.selection_height + diff_height
+        )
+
+class KeySelectionMove(KeyEventHook):
+    """
+    Move selected notes
+    """
+
+    modifiers = EVENT_MODIFIER_CTRL_SHIFT
+    keys = [key.Page_Up, key.Page_Down, key.Left, key.Right, key.Up, key.Down]
+
+    def activate(self, widget, keycode):
+        note_shift = {key.Page_Up: 12, key.Page_Down: -12, key.Up: 1, key.Down: -1}
+        pos_shift = {key.Left: -widget.note_size, key.Right: widget.note_size}
+            
+        widget.move_selection(
+            widget.selection_x + pos_shift.get(keycode, 0), 
+            widget.selection_y + note_shift.get(keycode, 0)
+        )
+                
+class KeyInputVolume(KeyEventHook):
+    """
+    Set input volume.
+    """
+
+    keys = [key.KP_Subtract, key.KP_Add]
+
+    def activate(self, widget, keycode):
+        volume = widget.cbo_vol.get_active()
+        widget.cbo_vol.set_active(
+            max(0, volume-1) if keycode == key.KP_Subtract else min(8, volume+1)
+        )
+
+class KeyInsertNote(KeyEventHook):
+    """
+    Insert note at cursor position
+    """
+
+    keys = [key.space]
+
+    def activate(self, widget, keycode):
+        if widget.vk_space == 0:
+
+            pos = widget.cursor_pos
+                
+            #Add it to track
+            if widget.recording:
+                widget.add_note(widget.selection_y, pos, widget.note_size, widget.volume)
+            
+            synth_conn = widget.conn.get_port(widget.track.get_synth())
+            if synth_conn != None: synth_conn.note_on(widget.selection_y, widget.track.get_port(), widget.volume)
+            widget.vk_space = 1
+
+    def deactivate(self, widget, keycode):
+        synth_conn = widget.conn.get_port(widget.track.get_synth())
+        if synth_conn != None: synth_conn.note_off(widget.selection_y, widget.track.get_port())
+        widget.vk_space = 0
+                
+class KeyVirtualPiano(KeyEventHook):
+    """
+    Handle virtual keyboard emulation so people without a midi controller
+    can have fun too.
+    """
+
+    keys = VIRTUAL_KEYBOARD
+
+    def activate(self, widget, keycode):
+        key_index = VIRTUAL_KEYBOARD.index(keycode)
+        if widget.scale:
+            if widget.scale_var:
+                scale = [(x+(widget.scale-1))%12 for x in SCALE_MIN]
+            else:
+                scale = [(x+(widget.scale-1))%12 for x in SCALE_MAJ]
+
+            if not (key_index % 12) in scale:
+                return True
+                
+        #If not key already pressed
+        if widget.vk_status[key_index] == 0:
+            note = (widget.octave+60) + key_index
+            
+            #Are we making changes?
+            if widget.recording:
+            
+                #In case Del is pressed
+                if widget.deleting:
+                    #Remember that we are "selected" deleting
+                    widget.deleting = 2
+                    
+                    #If not in playing mode Delete note now, else we wait the cursor to do the work
+                    if not widget.player.playing():
+                        for (dnote, dpos, dduration, dvolume) in widget.track.get_notes():
+                            if dpos == widget.cursor_pos and dnote == note:
+                                widget.del_note(dnote, dpos, dduration)
+                else:
+                    if widget.player.playing():
+                        #if we are playing, we must qantize
+                        beat_size = widget.note_size
+                        diff = widget.cursor_pos % beat_size
+                        pos = widget.cursor_pos - diff
+                        pat_len = widget.pat.get_len()*TICKS_PER_BEAT
+                        #Live recording. Save position, velocity and paint the start
+                        widget.notes_start_position_velocity[note] = (pos, widget.volume)
+                        widget.paint_note(note, pos % pat_len , widget.note_size)
+                            
+                    else:
+                        pos = widget.cursor_pos
+                        #Add it to track
+                        widget.add_note(note, pos, widget.note_size, widget.volume)
+                                                
+                    #Update Selection
+                    widget.update_selection(pos, note, widget.selection_width, widget.selection_height)
+                    
+            #If not Deleting let's make noise
+            if not widget.deleting:
+                synth_conn = widget.conn.get_port(widget.track.get_synth())
+                if synth_conn != None: synth_conn.note_on(note, widget.track.get_port(), widget.volume)
+            
+            #Keyboard status, to avoid repetition.
+            widget.vk_status[key_index] = 1
+            widget.vk_count = widget.vk_count + 1
+
+    def deactivate(self, widget, keycode):
+        key_index = VIRTUAL_KEYBOARD.index(keycode)
+
+        if widget.scale:
+            if widget.scale_var:
+                scale = [(x+(widget.scale-1))%12 for x in SCALE_MIN]
+            else:
+                scale = [(x+(widget.scale-1))%12 for x in SCALE_MAJ]
+
+            if not (key_index % 12) in scale:
+                return True
+
+        note = (widget.octave+60) + key_index
+        
+        #Update Keyboard Status
+        widget.vk_status[key_index] = 0
+        
+        if widget.vk_count > 0:
+            widget.vk_count = widget.vk_count - 1
+
+        if not widget.deleting:
+
+            #Stop the noise
+            synth_conn = widget.conn.get_port(widget.track.get_synth())
+            if synth_conn != None: synth_conn.note_off(note, widget.track.get_port())
+        
+            if widget.recording:
+                if widget.player.playing():
+                    (pos, velocity) = widget.notes_start_position_velocity[note]
+                    duration = widget.cursor_pos - (widget.cursor_pos % widget.note_size) - pos
+                    #Cut note duration at end of pattern
+                    if duration < 0:
+                        duration = widget.pat.get_len()*TICKS_PER_BEAT - pos
+                    #Minimal size is note size (grid size)
+                    if duration < widget.note_size: 
+                        duration = widget.note_size
+                    
+                    #Delete original temorary note    
+                    widget.del_note(note,pos)
+                    #Add new real note
+                    widget.add_note(note, pos, duration, velocity)
+                else:
+                    #If not playing move cursor manually and recording
+                    if widget.vk_count == 0:
+                        if (widget.cursor_pos % widget.note_size):
+                            widget.move_cursor(widget.cursor_pos + widget.note_size - (widget.cursor_pos % widget.note_size))
+                        else:
+                            widget.move_cursor(widget.cursor_pos + widget.note_size * widget.step_size)
+                            
+                        widget.update_selection(widget.cursor_pos, widget.selection_y, 1, 1)
+
 class TrackWidget:
     """
     Track widget object
@@ -88,7 +431,19 @@ class TrackWidget:
 
     # Which events are handled by hooks for the piano roll area
     piano_roll_key_event_hooks = [
-        KeyMoveCursor()
+        KeyMoveCursor(),
+        KeyDeletePiano(),
+        KeyBackspacePiano(),
+        KeyGridSize(),
+        KeyOctaveShift(),
+        KeyResizeSelection(),
+        KeyCutCopyPaste(),
+        KeyPlayControls(),
+        KeySelection(),
+        KeySelectionMove(),
+        KeyInputVolume(),
+        KeyInsertNote(),
+        KeyVirtualPiano(),
     ]
 
     def __init__(self, track, container):
@@ -726,202 +1081,6 @@ class TrackWidget:
                 hook.activate(self, val)
                 return True
         
-        #Control mask, to get shortcuts and avoid having to go with the mouse
-        if state == gtk.gdk.CONTROL_MASK:
-            grid_keys = [key._1, key._2, key._3, key._4, key._5, key._6]
-            #Grid size
-            if val in grid_keys:
-                self.cbo_grid.set_active(grid_keys.index(val))
-            #Octave Up    
-            elif val == key.Up:
-                if self.cbo_oct.get_active() > 0:
-                    self.cbo_oct.set_active(self.cbo_oct.get_active()-1)
-            #Octave Down
-            elif val == key.Down:
-                if self.cbo_oct.get_active() < 6:
-                    self.cbo_oct.set_active(self.cbo_oct.get_active()+1)
-            #Selection downsize
-            elif val == key.Left:
-                self.resize_selection(-1)
-            #Selection upsize
-            elif val == key.Right:
-                self.resize_selection(1)
-            #Cut Selection
-            elif val == key.x:
-                self.cut_selection()
-            #Copy Selection
-            elif val == key.c:
-                self.copy_selection()
-            #Paste Selection
-            elif val == key.v:
-                self.paste_selection()
-            #Play/Stop
-            elif val == key.p:
-                if self.player.playing():
-                    self.btn_stop_clicked(None)
-                else:
-                    self.btn_play_clicked(None)
-            #Stop
-            elif val == key.s:
-                self.btn_stop_clicked(None)
-            #Rec on/off
-            elif val == key.r:
-                if self.recording:
-                    self.chk_recording.set_active(0)
-                    self.recording = 0
-                else:
-                    self.chk_recording.set_active(1)
-                    self.recording = 1
-            #Mute trakcs
-            elif val == key.m:
-                #Muted track is NOT enabled... 
-                self.chk_mute_track.set_active(self.track.enabled)
-
-        #Control mask, to get shortcuts and avoid having to go with the mouse
-        elif state == gtk.gdk.SHIFT_MASK:
-            if val in [key.Left, key.Right, key.Up, key.Down]:
-                diff_width = 0
-                diff_height = 0
-
-                #Change selection size
-                if val == key.Up and self.selection_height > 1:
-                    diff_height = -1
-                elif val == key.Down:
-                    diff_height = 1
-                elif val == key.Left and self.selection_width > 1:
-                    diff_width = -1
-                #horrible formula to avoid going too far... must think about this and make it clear
-                elif val == key.Right and self.selection_x + self.selection_width * self.note_size < self.pat.get_len()*TICKS_PER_BEAT:
-                    diff_width = 1
-                            
-                #Update Selection
-                self.update_selection(self.selection_x, self.selection_y, 
-                                        self.selection_width + diff_width, self.selection_height + diff_height)
-                
-        elif state == gtk.gdk.MOD1_MASK:
-            if val in [key.Page_Up, key.Page_Down, key.Left, key.Right, key.Up, key.Down]:
-                #Modifiers
-                note_diff = 0
-                pos_diff = 0
-                if val == key.Page_Up:
-                    note_diff = 12
-                elif val == key.Page_Down:
-                    note_diff = -12
-                if val == key.Up:
-                    note_diff = 1
-                elif val == key.Down:
-                    note_diff = -1
-                elif val == key.Left:
-                    pos_diff = -self.note_size
-                elif val == key.Right:
-                    pos_diff = self.note_size
-                    
-                self.move_selection(self.selection_x + pos_diff, self.selection_y + note_diff)
-
-        else:
-            if val == key.space:
-                if self.vk_space == 0:
-
-                    pos = self.cursor_pos
-                        
-                    #Add it to track
-                    if self.recording:
-                        self.add_note(self.selection_y, pos, self.note_size, self.volume)
-                    
-                    if synth_conn != None: synth_conn.note_on(self.selection_y, self.track.get_port(), self.volume)
-                    self.vk_space = 1
-            #Volume Down    
-            elif val == key.KP_Subtract:
-                if self.cbo_vol.get_active() > 0:
-                    self.cbo_vol.set_active(self.cbo_vol.get_active()-1)
-            #Volume Up
-            elif val == key.KP_Add:
-                if self.cbo_vol.get_active() < 8:
-                    self.cbo_vol.set_active(self.cbo_vol.get_active()+1)
-                                    
-            elif val in VIRTUAL_KEYBOARD:
-                key_index = VIRTUAL_KEYBOARD.index(val)
-                if self.scale:
-                    if self.scale_var:
-                        scale = [(x+(self.scale-1))%12 for x in SCALE_MIN]
-                    else:
-                        scale = [(x+(self.scale-1))%12 for x in SCALE_MAJ]
-
-                    if not (key_index % 12) in scale:
-                        return True
-                        
-                #If not key already pressed
-                if self.vk_status[key_index] == 0:
-                    note = (self.octave+60) + key_index
-                    
-                    #Are we making changes?
-                    if self.recording:
-                    
-                        #In case Del is pressed
-                        if self.deleting:
-                            #Remember that we are "selected" deleting
-                            self.deleting = 2
-                            
-                            #If not in playing mode Delete note now, else we wait the cursor to do the work
-                            if not self.player.playing():
-                                for (dnote, dpos, dduration, dvolume) in self.track.get_notes():
-                                    if dpos == self.cursor_pos and dnote == note:
-                                        self.del_note(dnote, dpos, dduration)
-                        else:
-                            if self.player.playing():
-                                #if we are playing, we must qantize
-                                beat_size = self.note_size
-                                diff = self.cursor_pos % beat_size
-                                pos = self.cursor_pos - diff
-                                pat_len = self.pat.get_len()*TICKS_PER_BEAT
-                                #Live recording. Save position, velocity and paint the start
-                                self.notes_start_position_velocity[note] = (pos, self.volume)
-                                self.paint_note(note, pos % pat_len , self.note_size)
-                                    
-                            else:
-                                pos = self.cursor_pos
-                                #Add it to track
-                                self.add_note(note, pos, self.note_size, self.volume)
-                                                        
-                            #Update Selection
-                            self.update_selection(pos, note, self.selection_width, self.selection_height)
-                            
-                    #If not Deleting let's make noise
-                    if not self.deleting:
-                        if synth_conn != None: synth_conn.note_on(note, self.track.get_port(), self.volume)
-                    
-                    #Keyboard status, to avoid repetition.
-                    self.vk_status[key_index] = 1
-                    self.vk_count = self.vk_count + 1
-
-            if val == key.Delete:
-                if not self.deleting:
-                    self.deleting = 1
-                    
-            elif val == key.BackSpace:
-                #Delete only if recording and don't delete here if playing
-                if not self.player.playing() and self.recording:
-
-                    #Move cursor manually 
-                    if (self.cursor_pos % self.note_size):
-                        self.move_cursor(self.cursor_pos - (self.cursor_pos % self.note_size))
-                    else:
-                        self.move_cursor(self.cursor_pos - self.note_size * self.step_size)
-
-                    #Delete
-                    del_notes = []
-                    for item in self.track.get_notes(): del_notes.append(item)
-                    for (dnote, dpos, dduration, dvolume) in del_notes:
-                        if dpos == self.cursor_pos:
-                            self.del_note(dnote, dpos, dduration)
-
-                    #I have drink a lot of wine now... so i'm in lazy mode. repainting cursor the bad way
-                    self.move_cursor(self.cursor_pos)
-
-                    self.update_selection(self.cursor_pos, self.selection_y, 1, 1)
-                    
-        return True
-
     def window_key_release_event(self, widget, event):
         #local alias, to make things more readable (and writeable)
 
@@ -932,84 +1091,13 @@ class TrackWidget:
         state = event.state
         synth_conn = self.conn.get_port(self.track.get_synth())
         
-        if state == gtk.gdk.CONTROL_MASK:
-            #Shortucts have nothing to do here
-            pass
-        else:
-            if val == key.space:
-                if synth_conn != None: synth_conn.note_off(self.selection_y, self.track.get_port())
-                self.vk_space = 0
-            elif val in VIRTUAL_KEYBOARD:
-                key_index = VIRTUAL_KEYBOARD.index(val)
+        # Check for hooks on this key/modifier combination
+        for hook in self.piano_roll_key_event_hooks:
+            if state == hook.modifiers and val in hook.keys:
+                # If found, run hook and exit returning True
+                hook.deactivate(self, val)
+                return True
 
-                if self.scale:
-                    if self.scale_var:
-                        scale = [(x+(self.scale-1))%12 for x in SCALE_MIN]
-                    else:
-                        scale = [(x+(self.scale-1))%12 for x in SCALE_MAJ]
-
-                    if not (key_index % 12) in scale:
-                        return True
-
-                note = (self.octave+60) + key_index
-                
-                #Update Keyboard Status
-                self.vk_status[key_index] = 0
-                
-                if self.vk_count > 0:
-                    self.vk_count = self.vk_count - 1
-
-                if not self.deleting:
-
-                    #Stop the noise
-                    if synth_conn != None: synth_conn.note_off(note, self.track.get_port())
-                
-                    if self.recording:
-                        if self.player.playing():
-                            (pos, velocity) = self.notes_start_position_velocity[note]
-                            duration = self.cursor_pos - (self.cursor_pos % self.note_size) - pos
-                            #Cut note duration at end of pattern
-                            if duration < 0:
-                                duration = self.pat.get_len()*TICKS_PER_BEAT - pos
-                            #Minimal size is note size (grid size)
-                            if duration < self.note_size: 
-                                duration = self.note_size
-                            
-                            #Delete original temorary note    
-                            self.del_note(note,pos)
-                            #Add new real note
-                            self.add_note(note, pos, duration, velocity)
-                        else:
-                            #If not playing move cursor manually and recording
-                            if self.vk_count == 0:
-                                if (self.cursor_pos % self.note_size):
-                                    self.move_cursor(self.cursor_pos + self.note_size - (self.cursor_pos % self.note_size))
-                                else:
-                                    self.move_cursor(self.cursor_pos + self.note_size * self.step_size)
-                                    
-                                self.update_selection(self.cursor_pos, self.selection_y, 1, 1)
-                    
-            elif val == key.Delete:
-                #Delete only if recording and don't delete here if playing
-                if not self.player.playing() and self.recording:
-                    #Full delete?
-                    if self.deleting == 1:
-                        del_notes = []
-                        for item in self.track.get_notes(): del_notes.append(item)
-                        for (dnote, dpos, dduration, dvolume) in del_notes:
-                            if dpos == self.cursor_pos:
-                                self.del_note(dnote, dpos, dduration)
-
-                    #Move cursor manually 
-                    if (self.cursor_pos % self.note_size):
-                        self.move_cursor(self.cursor_pos + self.note_size - (self.cursor_pos % self.note_size))
-                    else:
-                        self.move_cursor(self.cursor_pos + self.note_size)
-
-                    self.update_selection(self.cursor_pos, self.selection_y, 1, 1)
-                
-                #Always clear delete note
-                self.deleting = 0
     
     #This is the MIDI Input handler, runs on the scheduled timer self.midi_keyboard_listen
     def handle_midi_input(self):
