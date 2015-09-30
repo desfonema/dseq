@@ -120,12 +120,12 @@ class PatternWindow(gtk.Window):
         self.vbox.show()
 
         self.add(self.vbox)
-        self.tw.area.grab_focus()
+        self.tw.piano_roll.notes_area.grab_focus()
 
     def close_dialog(self, widget, data=None):
         self.tw.btn_stop_clicked(None)
-        if self.tw.midi_keyboard_listen:
-            gobject.source_remove(self.tw.midi_keyboard_listen)
+        if self.tw.piano_roll.midi_keyboard_listen:
+            gobject.source_remove(self.tw.piano_roll.midi_keyboard_listen)
 
         self.destroy()
         

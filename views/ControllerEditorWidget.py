@@ -36,7 +36,7 @@ class ControllerEditorWidget(gtk.Expander):
         self.container = container
 
         #Space from left
-        alloc = self.container.tw.area_piano_sw.get_allocation()
+        alloc = self.container.tw.piano_roll.notes_area.get_allocation()
         self.space = alloc.width
 
         #Main Vertical Box where we put our controls
@@ -158,7 +158,7 @@ class ControllerEditorWidget(gtk.Expander):
         self.track = self.container.tw.track
 
         #Space from left
-        alloc = self.container.tw.area_piano_sw.get_allocation()
+        alloc = self.container.tw.piano_roll.keyboard_sw.get_allocation()
         self.space = alloc.width
 
         self.gc = self.style.fg_gc[gtk.STATE_NORMAL]

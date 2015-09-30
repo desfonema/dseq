@@ -20,7 +20,7 @@ class PitchbendEditorWidget(gtk.Expander):
         self.track = container.tw.track
 
         #Space from left
-        alloc = self.container.tw.area_piano_sw.get_allocation()
+        alloc = self.container.tw.piano_roll.notes_sw.get_allocation()
         self.space = alloc.width
 
         #Main Vertical Box where we put our controls

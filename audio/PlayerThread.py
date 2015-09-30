@@ -48,7 +48,6 @@ class PlayerThread(threading.Thread):
     def run(self):
         data = self.__play_queue.get()
         while data != 'quit':
-            print self.__data.__module__
             #Are we playing a channel or a single module?
             playing_channel = (self.__data.__module__ == 'Channel')
             
