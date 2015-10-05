@@ -138,7 +138,7 @@ class PatternWindow(gtk.Window):
         self.ntb_tracks.append_page(track_gui, lbl_track_name)
         track_gui.show()
         self.ntb_tracks.set_current_page(self.ntb_tracks.get_n_pages()-1)
-        self.tw.area.grab_focus()
+        self.tw.piano_roll.notes_area.grab_focus()
         
         self.container.save_state = False
         
@@ -201,7 +201,7 @@ class PatternWindow(gtk.Window):
         self.ntb_tracks.append_page(track_gui, lbl_track_name)
         track_gui.show()
         self.ntb_tracks.set_current_page(self.ntb_tracks.get_n_pages()-1)
-        self.tw.area.grab_focus()
+        self.tw.piano_roll.notes_area.grab_focus()
         self.container.save_state = False
 
     def cbo_midi_input_changed(self, widget, data= None):
@@ -211,9 +211,9 @@ class PatternWindow(gtk.Window):
         
     def btn_len_clicked(self, widget, data=None):
         self.pat.set_len(int(self.adj_len.get_value()))
-        self.tw.area.set_size_request(self.pat.get_len() * (BEAT_WIDTH + KEY_SPACE * TICKS_PER_BEAT)+32, 128 * (KEY_HEIGHT + KEY_SPACE))
-        self.tw.paint_roll()
-        self.tw.paint_selection()
+        self.tw.piano_roll.notes_area.set_size_request(self.pat.get_len() * (BEAT_WIDTH + KEY_SPACE * TICKS_PER_BEAT)+32, 128 * (KEY_HEIGHT + KEY_SPACE))
+        self.tw.piano_roll.paint_roll()
+        self.tw.piano_roll.notes_area_paint_selection()
         
         self.controller_editor_widget.area_resize()
         self.pitchbend_editor_widget.area_resize()
@@ -244,7 +244,7 @@ class PatternWindow(gtk.Window):
                         
             self.pat.set_len(new_len)
                         
-        self.tw.area.set_size_request(self.pat.get_len() * (BEAT_WIDTH + KEY_SPACE * TICKS_PER_BEAT)+32, 128 * (KEY_HEIGHT + KEY_SPACE))
+        self.tw.piano_roll.notes_area.set_size_request(self.pat.get_len() * (BEAT_WIDTH + KEY_SPACE * TICKS_PER_BEAT)+32, 128 * (KEY_HEIGHT + KEY_SPACE))
         self.tw.paint_roll()
         self.tw.paint_selection()
 
@@ -328,7 +328,7 @@ class PatternWindow(gtk.Window):
         
         clipboard = gtk.clipboard_get(gtk.gdk.SELECTION_CLIPBOARD)
         clipboard.set_text(text)        
-        self.tw.area.grab_focus()
+        self.tw.piano_roll.notes_area.grab_focus()
 
     def txt_track_name_change(self, widget, data, child):
         data.set_name(widget.get_text())
@@ -345,8 +345,7 @@ class PatternWindow(gtk.Window):
 
         data.set_synth(self.synth_list[widget.get_active()])
         self.container.save_state = False
-        self.tw.area.grab_focus()
-        #self.tw.area.grab_focus()
+        self.tw.piano_roll.notes_area.grab_focus()
                 
     def adj_track_port_change(self, widget, data=None):
         if data.get_port() != int(widget.get_value()):
