@@ -343,16 +343,18 @@ class KeyVirtualPiano(KeyEventHook):
                                 widget.del_note(dnote, dpos, dduration)
                 else:
                     if widget.player.playing():
+                        print "Add note Playing"
                         #if we are playing, we must qantize
                         beat_size = widget.note_size
                         diff = widget.cursor_pos % beat_size
                         pos = widget.cursor_pos - diff
                         pat_len = widget.pat.get_len()*TICKS_PER_BEAT
                         #Live recording. Save position, velocity and paint the start
-                        widget.notes_start_position_velocity[note] = (pos, widget.volume)
+                        widget.notes_insert_position_velocity[note] = (pos, widget.volume)
                         widget.paint_note(note, pos % pat_len , widget.note_size)
                             
                     else:
+                        print "Add note"
                         pos = widget.cursor_pos
                         #Add it to track
                         widget.add_note(note, pos, widget.note_size, widget.volume)
@@ -397,7 +399,7 @@ class KeyVirtualPiano(KeyEventHook):
         
             if widget.recording:
                 if widget.player.playing():
-                    (pos, velocity) = widget.notes_start_position_velocity[note]
+                    (pos, velocity) = widget.notes_insert_position_velocity[note]
                     duration = widget.cursor_pos - (widget.cursor_pos % widget.note_size) - pos
                     #Cut note duration at end of pattern
                     if duration < 0:
