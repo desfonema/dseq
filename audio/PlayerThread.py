@@ -3,7 +3,7 @@ import time
 import Queue
 
 from util import nanosleep
-import models.Sequence
+from  models import Sequence
 
 time.sleep = nanosleep.nanosleep
 TICKS_PER_BEAT = 24

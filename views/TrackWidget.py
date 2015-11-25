@@ -242,6 +242,7 @@ class TrackWidget:
     def load_track(self, track):
         self.track = track
         self.chk_mute_track.set_active(not self.track.enabled)
+        self.piano_roll.load_track(self)
         self.piano_roll.paint_roll()
         
     def grab_focus(self):

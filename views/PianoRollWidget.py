@@ -443,20 +443,7 @@ class PianoRollWidget(gtk.HBox):
         super(PianoRollWidget, self).__init__()
 
         self.debug = False
-        # Our parent T
-        self.track_widget = track_widget
-
-        # MIDI Synth Connection        
-        self.conn = self.track_widget.container.container.conn
-
-        # Player object
-        self.player = self.track_widget.player
-
-        # Pattern data object
-        self.pat = self.track_widget.pat
-
-        # Track data object
-        self.track = self.track_widget.track
+        self.load_track(track_widget)
 
         # Piano roll colors
         self.colors = {}
@@ -599,6 +586,22 @@ class PianoRollWidget(gtk.HBox):
         #self.notes_area.add_events(gtk.gdk.POINTER_MOTION_MASK)
         
         self.notes_area.set_flags(gtk.CAN_FOCUS)
+
+    def load_track(self, track_widget):
+        # Our parent T
+        self.track_widget = track_widget
+
+        # MIDI Synth Connection        
+        self.conn = self.track_widget.container.container.conn
+
+        # Player object
+        self.player = self.track_widget.player
+
+        # Pattern data object
+        self.pat = self.track_widget.pat
+
+        # Track data object
+        self.track = self.track_widget.track
 
     """
     ********************************************************
