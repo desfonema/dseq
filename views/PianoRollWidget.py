@@ -30,6 +30,11 @@ EVENT_MODIFIER_SHIFT = gtk.gdk.SHIFT_MASK
 EVENT_MODIFIER_CTRL = gtk.gdk.CONTROL_MASK
 EVENT_MODIFIER_CTRL_SHIFT = gtk.gdk.SHIFT_MASK | gtk.gdk.CONTROL_MASK
 
+EVENT_MOUSE = gtk.gdk.BUTTON1_MASK
+EVENT_MOUSE_SHIFT = EVENT_MOUSE | EVENT_MODIFIER_SHIFT
+EVENT_MOUSE_CTRL = EVENT_MOUSE | EVENT_MODIFIER_CTRL
+EVENT_MOUSE_CTRL_SHIFT = EVENT_MOUSE | EVENT_MODIFIER_CTRL_SHIFT
+
 class KeyEventHook:
     """
     Define a Keyboard event hook when keys in property keys are pressed
@@ -343,7 +348,6 @@ class KeyVirtualPiano(KeyEventHook):
                                 widget.del_note(dnote, dpos, dduration)
                 else:
                     if widget.player.playing():
-                        print "Add note Playing"
                         #if we are playing, we must qantize
                         beat_size = widget.note_size
                         diff = widget.cursor_pos % beat_size
@@ -354,7 +358,6 @@ class KeyVirtualPiano(KeyEventHook):
                         widget.paint_note(note, pos % pat_len , widget.note_size)
                             
                     else:
-                        print "Add note"
                         pos = widget.cursor_pos
                         #Add it to track
                         widget.add_note(note, pos, widget.note_size, widget.volume)
@@ -657,10 +660,11 @@ class PianoRollWidget(gtk.HBox):
         """
         self.paint_roll()
         self.notes_area_paint_selection()
-        
 
-    #Paint Piano Keys on expose event
     def keyboard_area_expose(self, area, event):
+        """
+        Paint Piano Keys on Expose event
+        """
 
         area.window.draw_rectangle(self.colors['background'], True, 0, 0, KEY_WIDTH + KEY_SPACE + KEY_SPACE, 128 * CURSOR_HEIGHT)
 
@@ -674,8 +678,12 @@ class PianoRollWidget(gtk.HBox):
                             KEY_WIDTH + KEY_SPACE - 1, KEY_HEIGHT - KEY_SPACE - 1)
         return True
 
-    #Handles mouse movement for the Piano Keys
     def keyboard_area_motion_notify(self, widget, event):
+        """
+        Keep track of the note that the mouse is pointing on the piano
+        by painting it blue. 
+        """
+
         note = 128 -  int(event.y / CURSOR_HEIGHT)
 
         self.keyboard_paint_note(self.mouse_note, self.colors['background'])
@@ -693,8 +701,12 @@ class PianoRollWidget(gtk.HBox):
         self.mouse_note = note
         self.keyboard_paint_note(self.mouse_note, self.colors['cursor'])
 
-    #Handles mouse buttons for Piano Keys
     def keyboard_area_button_press(self, widget, event):
+        """
+        Make a sound when you click on the keyboard on screen at the side
+        of the piano roll
+        """
+
         self.notes_area.grab_focus()
 
         note = 128 -  int(event.y / CURSOR_HEIGHT)
@@ -705,20 +717,27 @@ class PianoRollWidget(gtk.HBox):
             time.sleep(0.025)
             synth_conn.note_off(note, self.track.get_port())
 
-    #On mouse button click
     def notes_area_button_press(self, widget, event):
+        """
+        Handle mouse input on the notes area
+        """
         self.notes_area.grab_focus()
         
         pos = int(event.x / CURSOR_WIDTH)
         diff = pos % self.note_size
         pos = pos - diff
+        self.mouse_pos = pos
 
         note = 128 -  int(event.y / CURSOR_HEIGHT)
+        self.mouse_note = note
         synth_conn = self.conn.get_port(self.track.get_synth())
 
+        state = event.state
 
-        if event.button == 3:
-
+        if state == EVENT_MODIFIER_NONE:
+            self.move_cursor(pos)
+            self.update_selection(pos, note, pos + self.note_size, note)
+        elif state == EVENT_MODIFIER_SHIFT:
             #Add it to track
             if self.recording:
                 self.mouse_painting = 1
@@ -727,15 +746,10 @@ class PianoRollWidget(gtk.HBox):
                     synth_conn.note_on(note, self.track.get_port(), self.volume)
                     time.sleep(0.05)
                     synth_conn.note_off(note, self.track.get_port())
+        else:
+            print state
 
-        elif event.button == 1:
-            state = event.state
-            if not (state & (gtk.gdk.SHIFT_MASK | gtk.gdk.CONTROL_MASK)):
                 
-                self.update_selection(pos, note, 1, 1)
-                
-        elif event.button == 2:
-            self.move_cursor(pos)
         
     def notes_area_button_release(self, widget, event):
         state = event.state
@@ -756,26 +770,7 @@ class PianoRollWidget(gtk.HBox):
         
         state = event.state
         
-        if state & gtk.gdk.BUTTON1_MASK:
-            if state & gtk.gdk.SHIFT_MASK:
-                pos_diff =  pos - self.mouse_pos
-                note_diff =  note - self.mouse_note            
-                if pos_diff or note_diff:
-                    self.move_selection(self.sel_pos_from + pos_diff, self.sel_note_from + note_diff)
-            elif state & gtk.gdk.CONTROL_MASK:
-                if micropos - self.mouse_micropos:
-                    self.resize_selection(micropos - self.mouse_micropos)
-            else:
-                width =  (pos - self.sel_pos_from)/self.note_size + 1
-                height = self.sel_note_from - note
-
-                if width < 1: width = 1
-                if height < 1: height = 1
-
-                self.update_selection(self.sel_pos_from, self.sel_note_from, 
-                    width, height)
-                    
-        elif self.mouse_painting:
+        if self.mouse_painting:
 
             if pos != self.mouse_pos:
                 self.add_note(self.mouse_note, self.mouse_pos, self.note_size, self.volume)
@@ -792,6 +787,18 @@ class PianoRollWidget(gtk.HBox):
                         self.paint_note(snote, stime, sduration)
                     
                 self.paint_note(note, pos, self.note_size)
+        elif state == EVENT_MOUSE_CTRL_SHIFT:
+            pos_diff =  pos - self.mouse_pos
+            note_diff =  note - self.mouse_note            
+            if pos_diff or note_diff:
+                self.move_selection(self.sel_pos_from + pos_diff, self.sel_note_from + note_diff)
+        elif state == EVENT_MOUSE_CTRL:
+            if micropos - self.mouse_micropos:
+                self.resize_selection(micropos - self.mouse_micropos)
+        elif state == EVENT_MOUSE:
+            self.update_selection(self.sel_pos_from, self.sel_note_from, 
+                max(pos + self.note_size, self.sel_pos_from + self.note_size), min(note, self.sel_note_from))
+                    
 
         self.keyboard_paint_note(self.mouse_note, self.colors['background'])
         
@@ -807,7 +814,8 @@ class PianoRollWidget(gtk.HBox):
         
         #Sync player cursor with screen cursor if playing
         if self.player.playing():
-            self.move_cursor(self.player.get_pos())
+            pos = self.player.get_pos()
+            self.move_cursor(pos)
         
         synth_conn = self.conn.get_port(self.track.get_synth())
 
@@ -895,11 +903,7 @@ class PianoRollWidget(gtk.HBox):
                 self.container.controller_editor_widget.handle_midi_input(self.cursor_pos, event['data']['control']['param'], event['data']['control']['value'])
             elif event['type'] == alsaseq.EVENT_PITCH:
                 self.container.pitchbend_editor_widget.handle_midi_input(self.cursor_pos, event['data']['control']['value'])
-        if self.player.playing():
-            #Paint the cursor
-            self.move_cursor(self.cursor_pos)
-            #Repaint selection
-            self.notes_area_paint_selection()
+
         return True
 
     def notes_area_horizontal_value_changed(self, adj):
@@ -914,7 +918,7 @@ class PianoRollWidget(gtk.HBox):
         
     """
     ********************************************************
-    EDITING LOCIG SECTION OF THE CLASS.
+    EDITING LOGIC SECTION OF THE CLASS.
     ********************************************************
     """
                 
@@ -941,10 +945,12 @@ class PianoRollWidget(gtk.HBox):
             else:
                 self.hadj.set_value(page_size*(mypage-1)) 
 
-        self.notes_area_paint_vertical_grid_lines(128, 0, self.cursor_pos, self.cursor_pos)
+        self.notes_area_clear_cursor(self.cursor_pos)
+
         self.notes_area_paint_notes(128, 0, self.cursor_pos, self.cursor_pos+1)
-        self.cursor_pos = pos        
-        self.notes_area_paint_cursor(self.cursor_pos, 128, 0)
+
+        self.cursor_pos = pos
+        self.notes_area_paint_cursor(self.cursor_pos)
 
     def clear_selection(self):
         """
@@ -1004,7 +1010,7 @@ class PianoRollWidget(gtk.HBox):
         self.sel_pos_from = x
         self.sel_note_from = y
         self.sel_pos_to = self.sel_pos_to + diff_pos
-        self.sel_note_from = self.sel_note_from + diff_note
+        self.sel_note_to = self.sel_note_to + diff_note
 
         self.notes_area_paint_selection()
 
@@ -1209,14 +1215,25 @@ class PianoRollWidget(gtk.HBox):
         self.notes_area.window.draw_rectangle(self.colors['cursor'], False, 
                 x_from, y_from, x_to-x_from, y_to-y_from)
 
-    def notes_area_paint_cursor(self, pos, note_from=128, note_to=0):
+    def notes_area_paint_cursor(self, pos, note_from=128, note_to=0, color='cursor'):
         """
         Paint insert/play cursor at pos. Default to full paint of cursor.
         """
         y_from =(128-note_from) * CURSOR_HEIGHT
         y_to =(128-note_to+1) * CURSOR_HEIGHT
-        x = pos * CURSOR_WIDTH
-        self.notes_area.window.draw_line(self.colors['cursor'], x, y_from, x, y_to)
+        x = pos * CURSOR_WIDTH 
+        self.notes_area.window.draw_line(self.colors[color], x, y_from, x, y_to)
+
+    def notes_area_clear_cursor(self, pos):
+        """
+        Paint the grid at position pos
+        """
+        if pos % self.note_size == 0:
+            color = 'foreground' if pos % TICKS_PER_BEAT == 0 else 'grid'
+            self.notes_area_paint_cursor(pos, color=color)
+        else:
+            self.notes_area_paint_cursor(pos, color='background')
+            self.notes_area_paint_horizontal_grid_lines(128, 0, pos, pos)
 
     def notes_area_paint_horizontal_grid_lines(self, note_from, note_to, pos_from, pos_to):
         """
@@ -1262,7 +1279,6 @@ class PianoRollWidget(gtk.HBox):
         lines to separate notes.
         """
 
-        #import ipdb; ipdb.set_trace()
         x_from= pos_from * CURSOR_WIDTH
         x_to = pos_to * CURSOR_WIDTH
         x_width = x_to-x_from
