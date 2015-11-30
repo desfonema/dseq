@@ -236,24 +236,45 @@ class KeySelection(KeyEventHook):
         diff_width = 0
         diff_height = 0
 
+        if widget.sel_pos_start == -1:
+            widget.sel_pos_start = widget.sel_pos_from
+            widget.sel_note_start = widget.sel_note_from
+            widget.sel_pos_end = widget.sel_pos_from + widget.note_size
+            widget.sel_note_end = widget.sel_note_from
+
         #Change selection size
-        if keycode == key.Up and widget.sel_note_to < widget.sel_note_from:
-            diff_height = 1
+        if keycode == key.Up:
+            widget.sel_note_end += 1
         elif keycode == key.Down:
-            diff_height = -1
-        elif keycode == key.Left and widget.sel_pos_to - widget.note_size > widget.sel_pos_from:
-            diff_width = -widget.note_size
-        #horrible formula to avoid going too far... must think about this and make it clear
-        elif keycode == key.Right and widget.sel_pos_to + widget.note_size <= widget.pat.get_len()*TICKS_PER_BEAT:
-            diff_width = widget.note_size
+            widget.sel_note_end += -1
+        elif keycode == key.Left:
+            widget.sel_pos_end += -widget.note_size
+            if widget.sel_pos_end == widget.sel_pos_start:
+                widget.sel_pos_end += -widget.note_size
+        elif keycode == key.Right:
+            widget.sel_pos_end += widget.note_size
+            if widget.sel_pos_end == widget.sel_pos_start:
+                widget.sel_pos_end += widget.note_size
+                
                     
         #Update Selection
         widget.update_selection(
-            widget.sel_pos_from,
-            widget.sel_note_from, 
-            widget.sel_pos_to + diff_width,
-            widget.sel_note_to + diff_height
+            widget.sel_pos_start,
+            widget.sel_note_start, 
+            widget.sel_pos_end,
+            widget.sel_note_end
         )
+
+class KeySelectionEnd(KeyEventHook):
+    """
+    End selection of notes on the piano roll with the keyboard
+    """
+
+    modifiers = EVENT_MODIFIER_SHIFT
+    keys = [key.Shift_L, key.Shift_R]
+
+    def deactivate(self, widget, keycode):
+        widget.sel_pos_start = -1
 
 class KeySelectionMove(KeyEventHook):
     """
@@ -438,6 +459,7 @@ class PianoRollWidget(gtk.HBox):
         KeyCutCopyPaste(),
         KeyPlayControls(),
         KeySelection(),
+        KeySelectionEnd(),
         KeySelectionMove(),
         KeyInputVolume(),
         KeyInsertNote(),
@@ -500,8 +522,13 @@ class PianoRollWidget(gtk.HBox):
         # Selection is the tool to move, copy, paste and delete notes
         self.sel_pos_from = 0
         self.sel_pos_to = self.note_size
+        self.sel_pos_start = -1
+        self.sel_pos_end = -1
         self.sel_note_from = 60
         self.sel_note_to = 60
+        self.sel_note_start = -1
+        self.sel_note_end = -1
+
         # We keep track of the selected notes
         self.selection = []
         # And of mouse in progress selection
@@ -736,6 +763,8 @@ class PianoRollWidget(gtk.HBox):
 
         if state == EVENT_MODIFIER_NONE:
             self.move_cursor(pos)
+            self.sel_pos_start = pos
+            self.sel_note_start = note
             self.update_selection(pos, note, pos + self.note_size, note)
         elif state == EVENT_MODIFIER_SHIFT:
             #Add it to track
@@ -746,10 +775,6 @@ class PianoRollWidget(gtk.HBox):
                     synth_conn.note_on(note, self.track.get_port(), self.volume)
                     time.sleep(0.05)
                     synth_conn.note_off(note, self.track.get_port())
-        else:
-            print state
-
-                
         
     def notes_area_button_release(self, widget, event):
         state = event.state
@@ -796,8 +821,12 @@ class PianoRollWidget(gtk.HBox):
             if micropos - self.mouse_micropos:
                 self.resize_selection(micropos - self.mouse_micropos)
         elif state == EVENT_MOUSE:
-            self.update_selection(self.sel_pos_from, self.sel_note_from, 
-                max(pos + self.note_size, self.sel_pos_from + self.note_size), min(note, self.sel_note_from))
+            if pos >= self.sel_pos_start:
+                selpos = pos + self.note_size
+            else:
+                selpos = pos
+            self.update_selection(self.sel_pos_start, self.sel_note_start, 
+                selpos, note)
                     
 
         self.keyboard_paint_note(self.mouse_note, self.colors['background'])
@@ -970,10 +999,10 @@ class PianoRollWidget(gtk.HBox):
         self.clear_selection()
 
         #Update Selection Coords
-        self.sel_pos_from = pos_from
-        self.sel_note_from = note_from
-        self.sel_pos_to = pos_to
-        self.sel_note_to = note_to
+        self.sel_pos_from = max(0, min(pos_from, pos_to))
+        self.sel_note_from = max(note_from, note_to)
+        self.sel_pos_to = min(self.pat.get_len()*TICKS_PER_BEAT ,max(pos_from, pos_to))
+        self.sel_note_to = min(note_from, note_to)
 
         #Paint Selection
         self.notes_area_paint_selection()
