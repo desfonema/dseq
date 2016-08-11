@@ -4,11 +4,7 @@ the tracks tab for each pattern.
 """
 
 import gtk
-from gtk import keysyms as key
-import time
 
-from util import nanosleep
-from audio import alsaseq
 from PianoRollWidget import (
     PianoRollWidget,
     VIRTUAL_KEYBOARD,
@@ -16,8 +12,6 @@ from PianoRollWidget import (
     BEAT_WIDTH, TICKS_PER_BEAT,
     CURSOR_WIDTH, CURSOR_HEIGHT
 )
-
-time.sleep = nanosleep.nanosleep
 
 class TrackWidget:
     """

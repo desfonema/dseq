@@ -3,7 +3,7 @@ import time
 import Queue
 import jack
 from util import nanosleep
-import models.Sequence
+from models import Sequence
 
 jack.attach("dseq")
 
@@ -23,7 +23,7 @@ class PlayerThreadSong(threading.Thread):
         #Position means pattern if playing a channel, or cursor pos if playing pattern 
         self.__pos = 0
         self.__conn = conn
-        self.__quit = True
+        self.__quit = False
         self.__playing = False
         self.__repeat = False
         

@@ -117,13 +117,18 @@ class PatternWindow(gtk.Window):
         self.pitchbend_editor_widget.show()
         self.vbox.pack_start(self.pitchbend_editor_widget, False, False, 0)
 
+        self.tw.piano_roll.set_controller_editor_widget(
+            self.controller_editor_widget)
+        self.tw.piano_roll.set_pitchbend_editor_widget(
+            self.pitchbend_editor_widget)
+
         self.vbox.show()
 
         self.add(self.vbox)
         self.tw.piano_roll.notes_area.grab_focus()
 
     def close_dialog(self, widget, data=None):
-        self.tw.btn_stop_clicked(None)
+        self.tw.btn_stop_clicked(self.tw)
         if self.tw.piano_roll.midi_keyboard_listen:
             gobject.source_remove(self.tw.piano_roll.midi_keyboard_listen)
 

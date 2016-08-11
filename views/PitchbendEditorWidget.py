@@ -68,7 +68,7 @@ class PitchbendEditorWidget(gtk.Expander):
         self.track = self.container.tw.track
 
         #Space from left
-        alloc = self.container.tw.area_piano_sw.get_allocation()
+        alloc = self.area.get_allocation()
         self.space = alloc.width
 
         self.gc = self.style.fg_gc[gtk.STATE_NORMAL]

@@ -513,7 +513,7 @@ class SongWindow(gtk.Window):
 
             #self.player.set_pos(int(self.adj_pos.get_value()))
             self.player.set_data(channel)
-            self.player.set_bmp(self.song.get_bpm())
+            self.player.set_bpm(self.song.get_bpm())
             self.playing_pos = gobject.timeout_add(500, self.update_playing_pos)
         
     def update_playing_pos(self):

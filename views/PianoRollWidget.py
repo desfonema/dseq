@@ -3,6 +3,10 @@ from gtk import keysyms as key
 from gtk.gdk import color_parse
 import gobject
 import time
+from audio import alsaseq
+from util import nanosleep
+
+time.sleep = nanosleep.nanosleep
 
 KEY_WIDTH = 14
 KEY_HEIGHT = 7
@@ -635,6 +639,13 @@ class PianoRollWidget(gtk.HBox):
         # Track data object
         self.track = self.track_widget.track
 
+
+    def set_controller_editor_widget(self, widget):
+        self.controller_editor_widget = widget
+
+    def set_pitchbend_editor_widget(self, widget):
+        self.pitchbend_editor_widget = widget
+
     """
     ********************************************************
     EVENT HANDLERS SECTION OF THE CLASS.
@@ -825,6 +836,8 @@ class PianoRollWidget(gtk.HBox):
                 selpos = pos + self.note_size
             else:
                 selpos = pos
+            self.sel_pos_end = selpos
+            self.sel_note_end = note
             self.update_selection(self.sel_pos_start, self.sel_note_start, 
                 selpos, note)
                     
@@ -852,26 +865,25 @@ class PianoRollWidget(gtk.HBox):
         while self.conn.midi_input_event_pending():
             event = self.conn.get_midi_input_event()
             
-            if event['type'] == alsaseq.EVENT_NOTE:
+            if event['type'] == alsaseq.EVENT_NOTE_ON:
+                note = event['data']['note']['note']
+                velocity = event['data']['note']['velocity']
+
                 #Check if we are using a scale filter for notes
-                do_note = True
-                if self.scale and event['data']['note']['note']:
-                    note = event['data']['note']['note']
+                if self.scale:
                     if self.scale_var:
                         scale = [(x+(self.scale-1))%12 for x in SCALE_MIN]
                     else:
                         scale = [(x+(self.scale-1))%12 for x in SCALE_MAJ]
 
                     if not (note % 12) in scale:
-                        do_note = False
+                        continue
 
                 #Case note on (has velocity)
-                if do_note and event['data']['note']['note'] and event['data']['note']['velocity']:
+                if velocity:
                     #How many keys pressed? Used for step editing chords
                     self.midi_keyboard_count += 1
                     
-                    note = event['data']['note']['note']
-
                     #Are we making changes?
                     if self.recording:
                         #In case we are playing we qantize the note
@@ -883,7 +895,7 @@ class PianoRollWidget(gtk.HBox):
                         if self.player.playing():
                             #We still don't add that note, but paint the start of if and record velocity and pos
                             if self.track_widget.cbo_vol.get_active() > 7:
-                                self.notes_insert_position_velocity[note] = (pos, event['data']['note']['velocity'])
+                                self.notes_insert_position_velocity[note] = (pos, velocity)
                             else:
                                 self.notes_insert_position_velocity[note] = (pos, self.volume)
 
@@ -892,46 +904,42 @@ class PianoRollWidget(gtk.HBox):
                         else:
                             #If not playing, we add the note right now
                             if self.track_widget.cbo_vol.get_active() > 7:
-                                self.add_note(note, pos, self.note_size, event['data']['note']['velocity'])
+                                self.add_note(note, pos, self.note_size, velocity)
                             else:
                                 self.add_note(note, pos, self.note_size, self.volume)
 
                     if self.track_widget.cbo_vol.get_active() > 7:
-                        if synth_conn != None: synth_conn.note_on(note, self.track.get_port(), event['data']['note']['velocity'])
+                        if synth_conn != None: synth_conn.note_on(note, self.track.get_port(), velocity)
                     else:
                         if synth_conn != None: synth_conn.note_on(note, self.track.get_port(), self.volume)
                         
-                #Note off event
-                elif do_note and event['data']['note']['note']:
-                    self.midi_keyboard_count -= 1
-                    
-                    if self.recording:
-                        if self.player.playing():
-                            note = event['data']['note']['note']
-                            (pos, velocity) = self.notes_insert_position_velocity[note]
-                            duration = self.cursor_pos - (self.cursor_pos % self.note_size) - pos
-                            #Cut note duration at end of pattern
-                            if duration < 0:
-                                duration = self.pat.get_len()*TICKS_PER_BEAT - pos
-                            #Minimal size is note size (grid size)
-                            if duration < self.note_size: 
-                                duration = self.note_size
-                            
-                            #Add new real note
-                            self.add_note(note, pos, duration, velocity)
-                            
-                        elif self.midi_keyboard_count == 0: 
-                            #Move cursor if not playing and all notes are released
-                            if (self.cursor_pos % self.note_size):
-                                self.move_cursor(self.cursor_pos + self.note_size - (self.cursor_pos % self.note_size))
-                            else:
-                                self.move_cursor(self.cursor_pos + self.note_size * self.step_size)
+            elif event['type'] == alsaseq.EVENT_NOTE_OFF:
+                note = event['data']['note']['note']
+                self.midi_keyboard_count -= 1
+                
+                if self.recording:
+                    if self.player.playing():
+                        (pos, velocity) = self.notes_insert_position_velocity[note]
+                        duration = self.cursor_pos - (self.cursor_pos % self.note_size) - pos
+                        #Cut note duration at end of pattern
+                        if duration < 0:
+                            duration = self.pat.get_len()*TICKS_PER_BEAT - pos
+                        #Minimal size is note size (grid size)
+                        if duration < self.note_size: 
+                            duration = self.note_size
+                        
+                        #Add new real note
+                        self.add_note(note, pos, duration, velocity)
+                        
+                    elif self.midi_keyboard_count == 0: 
+                        #Move cursor if not playing and all notes are released
+                        self.move_cursor(self.cursor_pos + self.note_size)
 
-                    if synth_conn != None: synth_conn.note_off(event['data']['note']['note'], self.track.get_port())
+                if synth_conn != None: synth_conn.note_off(note, self.track.get_port())
             elif event['type'] == alsaseq.EVENT_CONTROLLER:
-                self.container.controller_editor_widget.handle_midi_input(self.cursor_pos, event['data']['control']['param'], event['data']['control']['value'])
+                self.controller_editor_widget.handle_midi_input(self.cursor_pos, event['data']['control']['param'], event['data']['control']['value'])
             elif event['type'] == alsaseq.EVENT_PITCH:
-                self.container.pitchbend_editor_widget.handle_midi_input(self.cursor_pos, event['data']['control']['value'])
+                self.pitchbend_editor_widget.handle_midi_input(self.cursor_pos, event['data']['control']['value'])
 
         return True
 
