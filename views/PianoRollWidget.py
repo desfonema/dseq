@@ -205,7 +205,7 @@ class KeyPlayControls(KeyEventHook):
     """
 
     modifiers = EVENT_MODIFIER_CTRL
-    keys = [key.m, key.s, key.r, key.p]
+    keys = [key.m, key.s, key.r, key.p, key.n]
 
     def activate(self, widget, keycode):
         #Play/Stop
@@ -219,16 +219,14 @@ class KeyPlayControls(KeyEventHook):
             widget.track_widget.btn_stop_clicked(None)
         #Rec on/off
         elif keycode == key.r:
-            if widget.recording:
-                widget.track_widget.chk_recording.set_active(0)
-                widget.recording = 0
-            else:
-                widget.track_widget.chk_recording.set_active(1)
-                widget.recording = 1
+            widget.track_widget.chk_recording.set_active(not widget.recording)
         #Mute trakcs
         elif keycode == key.m:
             #Muted track is NOT enabled... 
             widget.track_widget.chk_mute_track.set_active(widget.track.enabled)
+        #Mono rec
+        elif keycode == key.n:
+            widget.track_widget.chk_mono.set_active(not widget.rec_mono)
 
 class KeySelection(KeyEventHook):
     """
@@ -501,6 +499,7 @@ class PianoRollWidget(gtk.HBox):
 
         # Record flag
         self.recording = 1
+        self.rec_mono = False
 
         # Selective deletion flag while playing (a feature borrowed from Alesis SR16)
         self.deleting = 0
@@ -1162,13 +1161,37 @@ class PianoRollWidget(gtk.HBox):
                     (note, pos, duration, volume) = line.split(', ')
                     self.add_note( int(note)+self.sel_note_from, int(pos)+self.sel_pos_from, int(duration), int(volume) )
 
-    def add_note(self, note, pos, duration=1, volume=127, overlap=False):
+    def add_note(self, note, pos, duration=1, volume=127, overlap=False, mono=None):
         len = self.pat.get_len()*TICKS_PER_BEAT
-        
+       
+        n_start = pos % len 
+        n_end = n_start + duration
+
         #Paint it
-        self.paint_note(note, pos % len , duration)
+        self.paint_note(note, n_start, duration)
+        if mono is None:
+            mono = self.rec_mono
+
+        if mono:
+            # Remove other notes
+            for (snote, stime, sduration, svolume) in list(self.track.get_notes()):
+                o_start = stime
+                o_end = stime + sduration
+                
+                if o_end <= n_start or o_start >= n_end:
+                    continue
+
+                self.del_note(snote, stime, sduration)
+
+                if o_start < n_start:
+                    self.add_note(snote, o_start, n_start - o_start, svolume, mono=False)
+
+                if o_end > n_end:
+                    self.add_note(snote, n_end, o_end - n_end, svolume, mono=False)
+
+
         #Add it to track
-        self.track.add_note(note, pos % len, duration, volume, overlap)
+        self.track.add_note(note, n_start, duration, volume, overlap)
 
     #Deletes a note from the grid, the track and the sequence, and stops it's sound
     def del_note(self, note, pos, duration=1):

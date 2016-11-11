@@ -120,6 +120,12 @@ class TrackWidget:
         self.chk_recording.connect("toggled", self.chk_recording_toggled)
         self.chk_recording.show()
         hbox_menu.pack_start(self.chk_recording, False, False, 4)        
+
+        self.chk_mono = gtk.CheckButton("Mono")
+        self.chk_mono.set_active(False)
+        self.chk_mono.connect("toggled", self.chk_mono_toggled)
+        self.chk_mono.show()
+        hbox_menu.pack_start(self.chk_mono, False, False, 4)        
         
         self.chk_mute_track = gtk.CheckButton("Mute")
         self.chk_mute_track.set_active(not self.track.enabled)
@@ -158,6 +164,11 @@ class TrackWidget:
     #Record checkbox clicked Event
     def chk_recording_toggled(self, widget, data=None):
         self.piano_roll.recording =  self.chk_recording.get_active()
+        self.piano_roll.notes_area.grab_focus()
+        
+    #Monophonic record checkbox clicked Event
+    def chk_mono_toggled(self, widget, data=None):
+        self.piano_roll.rec_mono =  self.chk_mono.get_active()
         self.piano_roll.notes_area.grab_focus()
     
     #Mute checkbox clicked Event
