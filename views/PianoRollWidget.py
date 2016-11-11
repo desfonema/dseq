@@ -29,6 +29,8 @@ VIRTUAL_KEYBOARD = [
 SCALE_MAJ = [0,2,4,5,7,9,11]
 SCALE_MIN = [0,2,3,5,7,9,11]
 
+EVENT_MODIFIER_FILTER = gtk.gdk.SHIFT_MASK | gtk.gdk.CONTROL_MASK
+
 EVENT_MODIFIER_NONE = 0
 EVENT_MODIFIER_SHIFT = gtk.gdk.SHIFT_MASK
 EVENT_MODIFIER_CTRL = gtk.gdk.CONTROL_MASK
@@ -653,9 +655,9 @@ class PianoRollWidget(gtk.HBox):
     ********************************************************
     """
 
-    def notes_area_key_press(self, widget, event):
+    def _key_hook_handler(self, event, action='activate'):
         """
-        Call the right Key Hook activate method for the pressed key
+        Fitler event information and find the right event handler
         """
 
         # If we are playing the pattern, update position before anything else is done
@@ -664,34 +666,31 @@ class PianoRollWidget(gtk.HBox):
            
         # Get key value and state (modifiers, like CTRL, ALT, etc) 
         val = event.keyval
-        state = event.state
+        state = event.state & EVENT_MODIFIER_FILTER
 
         # Check for hooks on this key/modifier combination
         for hook in self.piano_roll_key_event_hooks:
             if state == hook.modifiers and val in hook.keys:
                 # If found, run hook and exit returning True
-                hook.activate(self, val)
+                if action == 'activate':
+                    hook.activate(self, val)
+                else:
+                    hook.deactivate(self, val)
                 return True
+
+    def notes_area_key_press(self, widget, event):
+        """
+        Call the right Key Hook activate method for the pressed key
+        """
+
+        return self._key_hook_handler(event)
         
     def notes_area_key_release(self, widget, event):
         """
         Call the right Key Hook deactivate method for the pressed key
         """
 
-        # If we are playing the pattern, update position before anything else is done
-        if self.player.playing():
-            self.move_cursor(self.player.get_pos())
-
-        # Get key value and state (modifiers, like CTRL, ALT, etc) 
-        val = event.keyval
-        state = event.state
-        
-        # Check for hooks on this key/modifier combination
-        for hook in self.piano_roll_key_event_hooks:
-            if state == hook.modifiers and val in hook.keys:
-                # If found, run hook and exit returning True
-                hook.deactivate(self, val)
-                return True
+        return self._key_hook_handler(event, action='deactivate')
 
     def notes_area_expose(self, notes_area, event):
         """
