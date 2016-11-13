@@ -814,6 +814,11 @@ class PianoRollWidget(gtk.HBox):
         """
         synth_conn = self.conn.get_port(self.track.get_synth())
 
+        #Normalize events
+        if (event['type'] == alsaseq.EVENT_NOTE_ON and 
+            not event['data']['note']['velocity']):
+            event['type'] == alsaseq.EVENT_NOTE_OFF
+
         if event['type'] == alsaseq.EVENT_NOTE_ON:
             note = event['data']['note']['note']
             velocity = event['data']['note']['velocity']
@@ -828,39 +833,28 @@ class PianoRollWidget(gtk.HBox):
                 if not (note % 12) in scale:
                     return
 
-            #Case note on (has velocity)
-            if velocity:
-                #How many keys pressed? Used for step editing chords
-                self.midi_keyboard_count += 1
+            #How many keys pressed? Used for step editing chords
+            self.midi_keyboard_count += 1
+            
+            #Are we making changes?
+            if self.recording:
+                #In case we are playing we qantize the note
+                pos = self.cursor_pos - (self.cursor_pos % self.note_size)
+
+                pat_len = self.pat.get_len()*TICKS_PER_BEAT
                 
-                #Are we making changes?
-                if self.recording:
-                    #In case we are playing we qantize the note
-                    pos = self.cursor_pos - (self.cursor_pos % self.note_size)
+                if self.track_widget.cbo_vol.get_active() <= 7:
+                    velocity = self.volume
 
-                    pat_len = self.pat.get_len()*TICKS_PER_BEAT
-                    
-                    #If we are playing, we wait to add the note on key release
-                    if self.player.playing():
-                        #We still don't add that note, but paint the start of if and record velocity and pos
-                        if self.track_widget.cbo_vol.get_active() > 7:
-                            self.notes_insert_position_velocity[note] = (pos, velocity)
-                        else:
-                            self.notes_insert_position_velocity[note] = (pos, self.volume)
-
-                        #Paint it
-                        self.paint_note(note, pos % pat_len , self.note_size)
-                    else:
-                        #If not playing, we add the note right now
-                        if self.track_widget.cbo_vol.get_active() > 7:
-                            self.add_note(note, pos, self.note_size, velocity)
-                        else:
-                            self.add_note(note, pos, self.note_size, self.volume)
-
-                if self.track_widget.cbo_vol.get_active() > 7:
-                    if synth_conn != None: synth_conn.note_on(note, self.track.get_port(), velocity)
+                if self.player.playing():
+                    # Keep track of the start
+                    self.notes_insert_position_velocity[note] = (pos, velocity)
+                    self.paint_note(note, pos % pat_len , self.note_size)
                 else:
-                    if synth_conn != None: synth_conn.note_on(note, self.track.get_port(), self.volume)
+                    #If not playing, we add the note right now
+                    self.add_note(note, pos, self.note_size, velocity)
+
+            if synth_conn != None: synth_conn.note_on(note, self.track.get_port(), velocity)
                     
         elif event['type'] == alsaseq.EVENT_NOTE_OFF:
             note = event['data']['note']['note']
