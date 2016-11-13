@@ -90,58 +90,22 @@ class KeyMoveCursor(KeyEventHook):
         
         widget.update_selection(widget.cursor_pos, note_from, widget.cursor_pos+widget.note_size, note_from)
 
-class KeyDeletePiano(KeyEventHook):
-    keys = [key.Delete]
 
-    def activate(self, widget, keycode):
-        if not widget.deleting:
-            widget.deleting = 1
+class KeyDeletePiano(KeyEventHook):
+    keys = [key.Delete, key.BackSpace]
 
     def deactivate(self, widget, keycode):
-        #Delete only if recording and don't delete here if playing
-        if not widget.player.playing() and widget.recording:
-            #Full delete?
-            if widget.deleting == 1:
-                del_notes = []
-                for item in widget.track.get_notes(): del_notes.append(item)
-                for (dnote, dpos, dduration, dvolume) in del_notes:
-                    if dpos == widget.cursor_pos:
-                        widget.del_note(dnote, dpos, dduration)
+        if widget.recording and not widget.player.playing():
+            if keycode == key.BackSpace:
+                widget.move_cursor(widget.cursor_pos - widget.note_size * widget.step_size)
 
-            #Move cursor manually 
-            if (widget.cursor_pos % widget.note_size):
-                widget.move_cursor(widget.cursor_pos + widget.note_size - (widget.cursor_pos % widget.note_size))
-            else:
-                widget.move_cursor(widget.cursor_pos + widget.note_size)
+            for (note, pos, duration, volume) in list(widget.track.get_notes()):
+                if pos == widget.cursor_pos:
+                    widget.del_note(note, pos, duration)
 
-            widget.update_selection(widget.cursor_pos, widget.sel_note_from, 1, 1)
+            if keycode == key.Delete:
+                widget.move_cursor(widget.cursor_pos + widget.note_size * widget.step_size)
         
-        #Always clear delete note
-        widget.deleting = 0
-            
-class KeyBackspacePiano(KeyEventHook):
-    keys = [key.BackSpace]
-
-    def activate(self, widget, keycode):
-        #Delete only if recording and don't delete here if playing
-        if not widget.player.playing() and widget.recording:
-
-            #Move cursor manually 
-            widget.move_cursor(
-                widget.cursor_pos - widget.cursor_pos % widget.note_size - widget.note_size * widget.step_size)
-
-            #Delete
-            del_notes = []
-            for item in widget.track.get_notes():
-                del_notes.append(item)
-
-            for (dnote, dpos, dduration, dvolume) in del_notes:
-                if dpos == widget.cursor_pos:
-                    widget.del_note(dnote, dpos, dduration)
-
-            # Move cursor
-            widget.move_cursor(widget.cursor_pos)
-                    
 
 class KeyGridSize(KeyEventHook):
     """
@@ -382,7 +346,6 @@ class PianoRollWidget(gtk.HBox):
     piano_roll_key_event_hooks = [
         KeyMoveCursor(),
         KeyDeletePiano(),
-        KeyBackspacePiano(),
         KeyGridSize(),
         KeyOctaveShift(),
         KeyResizeSelection(),
@@ -427,9 +390,6 @@ class PianoRollWidget(gtk.HBox):
         self.recording = 1
         self.rec_mono = False
 
-        # Selective deletion flag while playing (a feature borrowed from Alesis SR16)
-        self.deleting = 0
-        
         # Input volume
         self.volume = 127
         
