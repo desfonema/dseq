@@ -340,115 +340,41 @@ class KeyVirtualPiano(KeyEventHook):
     Handle virtual keyboard emulation so people without a midi controller
     can have fun too.
     """
-
     keys = VIRTUAL_KEYBOARD
 
-    def activate(self, widget, keycode):
-        key_index = VIRTUAL_KEYBOARD.index(keycode)
-        if widget.scale:
-            if widget.scale_var:
-                scale = [(x+(widget.scale-1))%12 for x in SCALE_MIN]
-            else:
-                scale = [(x+(widget.scale-1))%12 for x in SCALE_MAJ]
+    def _gen_event(self, ev_type, note, velocity):
+        """
+        Create a midi event to pass to handle_midi_event
+        """
+        event = {'type': ev_type,
+                 'data': {'note': {'note': note,
+                                   'velocity': velocity}}}
+        return event
+        
 
-            if not (key_index % 12) in scale:
-                return True
-                
+    def activate(self, widget, keycode):
         #If not key already pressed
-        if widget.vk_status[key_index] == 0:
+        key_index = VIRTUAL_KEYBOARD.index(keycode)
+        if not widget.vk_status[key_index]:
             note = (widget.octave+60) + key_index
-            
-            #Are we making changes?
-            if widget.recording:
-            
-                #In case Del is pressed
-                if widget.deleting:
-                    #Remember that we are "selected" deleting
-                    widget.deleting = 2
-                    
-                    #If not in playing mode Delete note now, else we wait the cursor to do the work
-                    if not widget.player.playing():
-                        for (dnote, dpos, dduration, dvolume) in widget.track.get_notes():
-                            if dpos == widget.cursor_pos and dnote == note:
-                                widget.del_note(dnote, dpos, dduration)
-                else:
-                    if widget.player.playing():
-                        #if we are playing, we must qantize
-                        beat_size = widget.note_size
-                        diff = widget.cursor_pos % beat_size
-                        pos = widget.cursor_pos - diff
-                        pat_len = widget.pat.get_len()*TICKS_PER_BEAT
-                        #Live recording. Save position, velocity and paint the start
-                        widget.notes_insert_position_velocity[note] = (pos, widget.volume)
-                        widget.paint_note(note, pos % pat_len , widget.note_size)
-                            
-                    else:
-                        pos = widget.cursor_pos
-                        #Add it to track
-                        widget.add_note(note, pos, widget.note_size, widget.volume)
-                                                
-                    #Update Selection
-                    widget.update_selection(pos, note, pos + widget.note_size, note)
-                    
-            #If not Deleting let's make noise
-            if not widget.deleting:
-                synth_conn = widget.conn.get_port(widget.track.get_synth())
-                if synth_conn != None: synth_conn.note_on(note, widget.track.get_port(), widget.volume)
+            event = self._gen_event(alsaseq.EVENT_NOTE_ON, note, widget.volume)
             
             #Keyboard status, to avoid repetition.
             widget.vk_status[key_index] = 1
             widget.vk_count = widget.vk_count + 1
 
+            widget.handle_midi_event(event)
+
     def deactivate(self, widget, keycode):
         key_index = VIRTUAL_KEYBOARD.index(keycode)
-
-        if widget.scale:
-            if widget.scale_var:
-                scale = [(x+(widget.scale-1))%12 for x in SCALE_MIN]
-            else:
-                scale = [(x+(widget.scale-1))%12 for x in SCALE_MAJ]
-
-            if not (key_index % 12) in scale:
-                return True
-
         note = (widget.octave+60) + key_index
+        event = self._gen_event(alsaseq.EVENT_NOTE_OFF, note, widget.volume)
         
-        #Update Keyboard Status
+        #Keyboard status
         widget.vk_status[key_index] = 0
-        
-        if widget.vk_count > 0:
-            widget.vk_count = widget.vk_count - 1
+        widget.vk_count = max(widget.vk_count -1, 0)
+        widget.handle_midi_event(event)
 
-        if not widget.deleting:
-
-            #Stop the noise
-            synth_conn = widget.conn.get_port(widget.track.get_synth())
-            if synth_conn != None: synth_conn.note_off(note, widget.track.get_port())
-        
-            if widget.recording:
-                if widget.player.playing():
-                    (pos, velocity) = widget.notes_insert_position_velocity[note]
-                    duration = widget.cursor_pos - (widget.cursor_pos % widget.note_size) - pos
-                    #Cut note duration at end of pattern
-                    if duration < 0:
-                        duration = widget.pat.get_len()*TICKS_PER_BEAT - pos
-                    #Minimal size is note size (grid size)
-                    if duration < widget.note_size: 
-                        duration = widget.note_size
-                    
-                    #Delete original temorary note    
-                    widget.del_note(note,pos)
-                    #Add new real note
-                    widget.add_note(note, pos, duration, velocity)
-                else:
-                    #If not playing move cursor manually and recording
-                    if widget.vk_count == 0:
-                        if (widget.cursor_pos % widget.note_size):
-                            widget.move_cursor(widget.cursor_pos + widget.note_size - (widget.cursor_pos % widget.note_size))
-                        else:
-                            widget.move_cursor(widget.cursor_pos + widget.note_size * widget.step_size)
-                        
-                        widget.update_selection(widget.sel_pos_from, widget.sel_note_from, widget.sel_pos_to, widget.sel_note_to)
 
 class PianoRollWidget(gtk.HBox):
 
